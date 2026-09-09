@@ -1,0 +1,15 @@
+{
+  "name": "組み立て — Carte de kanjis",
+  "short_name": "組み立て",
+  "description": "Carte de kanjis construite à la main, radical par radical.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#E7E1CE",
+  "theme_color": "#E7E1CE",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
