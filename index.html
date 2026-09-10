@@ -4443,6 +4443,11 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
       }},
       { selector: ".dimmed", style: { "opacity": 0.15 } },
       { selector: "node.highlighted", style: { "opacity": 1 } },
+      { selector: "node.just-created", style: {
+          "overlay-color": "#A6332B",
+          "overlay-opacity": 0.18,
+          "overlay-padding": 7
+      }},
       { selector: "edge.highlighted", style: { "width": 2.4, "opacity": 1 } },
       { selector: "node:selected", style: { "border-width": 3, "border-color": "#A6332B" } }
     ],
@@ -4489,16 +4494,49 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     renderStats();
   }
 
+  var currentStatusFilter = null;
+
+  function highlightByStatus(status){
+    var matches = cy.nodes().filter(function(n){ return n.data("status") === status; });
+    cy.batch(function(){
+      cy.elements().removeClass("highlighted just-created").addClass("dimmed");
+      matches.removeClass("dimmed").addClass("highlighted");
+    });
+    currentHighlightId = null;
+    if(matches.length){
+      cy.animate({ fit: { eles: matches, padding: 70 }, duration: 400 });
+    }
+  }
+
   function renderStats(){
     var nodes = allNodes();
-    var kCount = nodes.filter(function(n){return n.type==="k";}).length;
-    var rCount = nodes.filter(function(n){return n.type==="r";}).length;
-    var learned = nodes.filter(function(n){return n.status==="learned";}).length;
+    var unknown = nodes.filter(function(n){ return (n.status||"unknown")==="unknown"; }).length;
+    var inProgress = nodes.filter(function(n){ return n.status==="in_progress"; }).length;
+    var learned = nodes.filter(function(n){ return n.status==="learned"; }).length;
     var html = "";
-    html += '<div class="stat" title="Kanjis"><span class="dot" style="background:#2B3A55"></span>'+kCount+'</div>';
-    html += '<div class="stat" title="Radicaux"><span class="dot" style="background:#9a9384"></span>'+rCount+'</div>';
-    html += '<div class="stat" title="Appris"><span class="dot" style="background:#A6332B"></span><b>'+learned+'</b></div>';
+    html += '<div class="stat" data-status-filter="unknown" title="Inconnu" style="cursor:pointer;">'+
+            '<span class="dot" style="background:#9a9384"></span>'+unknown+'</div>';
+    html += '<div class="stat" data-status-filter="in_progress" title="En cours" style="cursor:pointer;">'+
+            '<span class="dot" style="background:#2B3A55"></span>'+inProgress+'</div>';
+    html += '<div class="stat" data-status-filter="learned" title="Appris" style="cursor:pointer;">'+
+            '<span class="dot" style="background:#A6332B"></span><b>'+learned+'</b></div>';
     document.getElementById("stats").innerHTML = html;
+
+    document.querySelectorAll("#stats [data-status-filter]").forEach(function(el){
+      el.addEventListener("click", function(){
+        var status = el.getAttribute("data-status-filter");
+        if(currentStatusFilter === status){
+          currentStatusFilter = null;
+          clearHighlight();
+        } else {
+          currentStatusFilter = status;
+          highlightByStatus(status);
+        }
+        document.querySelectorAll("#stats .stat").forEach(function(s){
+          s.style.outline = (s.getAttribute("data-status-filter")===currentStatusFilter) ? "2px solid var(--ink)" : "none";
+        });
+      });
+    });
   }
 
   // ---------- Sheets ----------
@@ -4693,6 +4731,7 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
 
   cy.on("tap", "node", function(evt){
     if(justHeld){ justHeld = false; return; }
+    cy.elements().removeClass("just-created");
     var id = evt.target.id();
 
     if(inFocusMode){
@@ -4713,6 +4752,7 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
 
   cy.on("tap", function(evt){
     if(evt.target !== cy) return;
+    cy.elements().removeClass("just-created");
     if(inFocusMode){
       var anchor = focusAnchorId;
       exitFocusMode();
@@ -5085,6 +5125,19 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     save();
     closeSheets();
     renderGraph();
+
+    // Briefly highlight the newly saved node and its links so it's easy to spot, then fade back to normal
+    currentHighlightId = id;
+    highlightLineage(id);
+    var justCreatedSubgraph = subgraphOf(id);
+    if(justCreatedSubgraph) justCreatedSubgraph.addClass("just-created");
+    setTimeout(function(){
+      if(currentHighlightId === id){
+        clearHighlight();
+        currentHighlightId = null;
+      }
+      cy.elements().removeClass("just-created");
+    }, 3500);
   });
 
   document.getElementById("fab").addEventListener("click", function(){ openForm(null); });
