@@ -26,6 +26,10 @@
     --border: rgba(28,27,25,0.22);
     --shadow: 0 6px 20px rgba(28,27,25,0.18);
     --radius: 2px;
+    --kanji-display: "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Times New Roman", serif;
+  }
+  html.font-gothic{
+    --kanji-display: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", "Noto Sans JP", -apple-system, sans-serif;
   }
   *{ box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html,body{
@@ -35,7 +39,7 @@
     color:var(--ink);
   }
   .kanji-font{
-    font-family: "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Times New Roman", serif;
+    font-family: var(--kanji-display);
   }
 
   /* --- App shell --- */
@@ -52,7 +56,7 @@
     font-size:15px; letter-spacing:0.02em; color:var(--ink);
     display:flex; flex-direction:column; line-height:1.15;
   }
-  #topbar .title .jp{ font-size:20px; font-weight:600; }
+  #topbar .title{ flex:none; max-width:40%; } #topbar .title .jp{ font-size:17px; font-weight:600; white-space:nowrap; }
   #topbar .title .fr{ font-size:11px; color:var(--ink-soft); margin-top:1px; }
   #stats{
     display:flex; gap:10px; pointer-events:auto;
@@ -150,7 +154,7 @@
   }
   .field textarea{ resize:vertical; min-height:56px; }
   .field.char input{
-    font-family: "Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif;
+    font-family: var(--kanji-display);
     font-size:28px; text-align:center; padding:12px;
   }
   .field-error{ font-size:11px; color:var(--seal); margin-top:5px; display:none; }
@@ -184,7 +188,7 @@
     background:var(--paper); border:1px solid var(--border); border-radius:3px;
     padding:5px 8px 5px 9px; font-size:13px;
   }
-  .parent-chip .ch{ font-family:"Hiragino Mincho ProN","Yu Mincho",serif; font-size:15px; }
+  .parent-chip .ch{ font-family:var(--kanji-display); font-size:15px; }
   .parent-chip button{
     background:none; border:none; color:var(--ink-soft); font-size:14px; cursor:pointer; padding:0; line-height:1;
   }
@@ -204,7 +208,7 @@
     border-bottom:1px solid var(--paper-line);
   }
   .parent-suggest .opt:last-child{ border-bottom:none; }
-  .parent-suggest .opt .ch{ font-family:"Hiragino Mincho ProN","Yu Mincho",serif; font-size:16px; }
+  .parent-suggest .opt .ch{ font-family:var(--kanji-display); font-size:16px; }
   .parent-suggest .opt .meaning{ color:var(--ink-soft); font-size:12px; }
   .parent-suggest .opt.create{ color:var(--indigo); font-style:italic; }
   .parent-suggest .opt.seed{ opacity:0.68; }
@@ -221,13 +225,19 @@
   .lib-row{
     display:flex; align-items:center; gap:12px; padding:10px 4px; border-bottom:1px solid var(--paper-line); cursor:pointer;
   }
-  .lib-row .ch{ font-family:"Hiragino Mincho ProN","Yu Mincho",serif; font-size:22px; width:34px; text-align:center; flex:none; }
+  .lib-row .ch{ font-family:var(--kanji-display); font-size:22px; width:34px; text-align:center; flex:none; }
   .lib-row .info{ flex:1; min-width:0; }
   .lib-row .info .m{ font-size:13.5px; }
   .lib-row .info .m .en-badge{ font-size:9px; color:var(--ink-soft); border:1px solid var(--border); border-radius:2px; padding:1px 3px; margin-left:5px; }
   .lib-row .jlpt-badge{ font-size:10px; color:var(--ink-soft); border:1px solid var(--border); border-radius:2px; padding:2px 5px; flex:none; }
   .lib-row.active-row{ opacity:0.55; }
   .lib-row.active-row .jlpt-badge{ background:var(--seal); color:#F1ECDD; border-color:var(--seal); }
+  .results-overlay{
+    position:fixed; top:60px; left:16px; right:16px; max-height:56vh; overflow-y:auto;
+    background:var(--paper-card); border:1px solid var(--border); border-radius:8px;
+    box-shadow: var(--shadow); z-index:60; padding:4px 12px; display:none;
+  }
+  .results-overlay.show{ display:block; }
   .btn{
     flex:1; padding:12px; text-align:center; font-size:13.5px; font-weight:600;
     border-radius:3px; border:none; cursor:pointer;
@@ -248,14 +258,14 @@
     white-space:pre-wrap;
   }
   .detail-readonly .kanji-hero{
-    font-family:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif;
+    font-family:var(--kanji-display);
     font-size:52px; text-align:center; margin: 4px 0 10px;
   }
   .comp-tag{
     display:inline-flex; align-items:center; gap:5px; background:var(--paper); border:1px solid var(--border);
     border-radius:3px; padding:4px 8px; margin:3px 3px 0 0; font-size:12.5px; cursor:pointer;
   }
-  .comp-tag .ch{ font-family:"Hiragino Mincho ProN","Yu Mincho",serif; }
+  .comp-tag .ch{ font-family:var(--kanji-display); }
   .ch.custom, .parent-chip .ch.custom, .parent-suggest .opt .ch.custom{
     font-family: inherit; font-style: italic; font-size: 12px; color: var(--indigo);
   }
@@ -281,14 +291,18 @@
 
   <div id="focusBanner">Vue isolée · tape un kanji pour repartir de lui, ou dans le vide pour revenir</div>
 
+  <div id="mapSearchList" class="results-overlay"></div>
+  <div id="libList" class="results-overlay"></div>
+
   <div id="topbar">
     <div class="title">
       <span class="jp kanji-font">組み立て</span>
       <span class="fr">ta carte de kanjis</span>
     </div>
     <div style="display:flex; align-items:center; gap:8px; pointer-events:auto;">
-      <button id="btnMapSearch" style="background:var(--paper-card); border:1px solid var(--border); border-radius:50%; width:34px; height:34px; font-size:15px; cursor:pointer;">🔍</button>
-      <button id="btnLibrary" style="background:var(--paper-card); border:1px solid var(--border); border-radius:50%; width:34px; height:34px; font-size:16px; cursor:pointer;">📚</button>
+      <button id="btnFont" style="background:var(--paper-card); border:1px solid var(--border); border-radius:50%; width:30px; height:30px; font-size:14px; cursor:pointer; font-weight:600;">Aa</button>
+      <button id="btnMapSearch" style="background:var(--paper-card); border:1px solid var(--border); border-radius:50%; width:30px; height:30px; font-size:15px; cursor:pointer;">🔍</button>
+      <button id="btnLibrary" style="background:var(--paper-card); border:1px solid var(--border); border-radius:50%; width:30px; height:30px; font-size:16px; cursor:pointer;">📚</button>
       <div id="stats"></div>
     </div>
   </div>
@@ -346,7 +360,6 @@
       <div class="field">
         <input type="text" id="mapSearchInput" placeholder="Chercher un caractère ou un sens…">
       </div>
-      <div id="mapSearchList"></div>
     </div>
   </div>
 
@@ -370,7 +383,6 @@
           <button type="button" data-jlpt="N2-N1">N2-N1</button>
         </div>
       </div>
-      <div id="libList"></div>
     </div>
   </div>
 
@@ -4322,6 +4334,22 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
   }
 
   var STORAGE_KEY = "kanjimap_manual_v1";
+  var FONT_KEY = "kanjimap_font_pref";
+  function kanjiFontStack(){
+    var pref = localStorage.getItem(FONT_KEY) || "mincho";
+    return pref === "gothic"
+      ? "Hiragino Kaku Gothic ProN, Hiragino Sans, Yu Gothic, Noto Sans JP, -apple-system, sans-serif"
+      : "Hiragino Mincho ProN, Yu Mincho, Noto Serif JP, serif";
+  }
+  function applyFontPref(){
+    var pref = localStorage.getItem(FONT_KEY) || "mincho";
+    document.documentElement.classList.toggle("font-gothic", pref === "gothic");
+    var btn = document.getElementById("btnFont");
+    if(btn) btn.style.background = pref === "gothic" ? "var(--indigo)" : "var(--paper-card)";
+    if(btn) btn.style.color = pref === "gothic" ? "#F1ECDD" : "var(--ink)";
+  }
+  applyFontPref();
+
   var state = { nodes: {} }; // id(char) -> node object
   var editingId = null; // char id currently being edited, or null for new
   var pendingParents = []; // array of char ids selected in the form
@@ -4383,7 +4411,7 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
           "border-style": function(n){ return n.data("type")==="k" ? "solid" : "dashed"; },
           "border-color": function(n){ return statusColor(n.data("status")); },
           "label": function(n){ return n.data("hasImage") ? n.data("label") : n.data("label"); },
-          "font-family": function(n){ return n.data("isCustom") ? "-apple-system, Segoe UI, Roboto, sans-serif" : "Hiragino Mincho ProN, Yu Mincho, Noto Serif JP, serif"; },
+          "font-family": function(n){ return n.data("isCustom") ? "-apple-system, Segoe UI, Roboto, sans-serif" : kanjiFontStack(); },
           "font-size": function(n){ return n.data("hasImage") ? 9.5 : (n.data("isCustom") ? 11 : (n.data("type")==="k" ? 24 : 18)); },
           "font-style": function(n){ return n.data("isCustom") ? "italic" : "normal"; },
           "text-wrap": function(n){ return (n.data("isCustom") || n.data("hasImage")) ? "wrap" : "none"; },
@@ -4484,6 +4512,7 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
   function closeSheets(){
     backdrop.classList.remove("show");
     document.querySelectorAll(".sheet").forEach(function(s){ s.classList.remove("show"); });
+    document.querySelectorAll(".results-overlay").forEach(function(o){ o.classList.remove("show"); });
   }
   backdrop.addEventListener("click", closeSheets);
   document.querySelectorAll("[data-close]").forEach(function(b){
@@ -5122,6 +5151,7 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     renderLibrary();
     closeSheets();
     openSheet(sheetLibrary);
+    libList.classList.add("show");
   });
 
   // ---------- Map search (find something already on the map) ----------
@@ -5165,6 +5195,15 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     renderMapSearch();
     closeSheets();
     openSheet(sheetMapSearch);
+    mapSearchList.classList.add("show");
+  });
+
+  document.getElementById("btnFont").addEventListener("click", function(){
+    var current = localStorage.getItem(FONT_KEY) || "mincho";
+    var next = current === "mincho" ? "gothic" : "mincho";
+    localStorage.setItem(FONT_KEY, next);
+    applyFontPref();
+    renderGraph();
   });
 
   // ---------- init ----------
