@@ -81,6 +81,15 @@
     background-size: 44px 44px;
   }
   #empty.show{ display:flex; }
+
+  #focusBanner{
+    position:absolute; top:56px; left:50%; transform:translateX(-50%) translateY(-8px);
+    z-index:19; background:var(--indigo); color:#F1ECDD; font-size:11.5px;
+    padding:7px 14px; border-radius:20px; opacity:0; pointer-events:none;
+    transition:opacity .2s ease, transform .2s ease; max-width:88%; text-align:center;
+    box-shadow: var(--shadow);
+  }
+  #focusBanner.show{ opacity:1; transform:translateX(-50%) translateY(0); }
   #empty .glyph{ font-size:64px; color:var(--ink); opacity:0.85; }
   #empty h2{ margin:0; font-size:17px; font-weight:600; }
   #empty p{ margin:0; font-size:13px; color:var(--ink-soft); max-width:280px; line-height:1.5; }
@@ -269,6 +278,8 @@
     <h2>La carte est vide</h2>
     <p>Ajoute ton premier radical ou kanji pour commencer à construire ta carte, pièce par pièce.</p>
   </div>
+
+  <div id="focusBanner">Vue isolée · tape un kanji pour repartir de lui, ou dans le vide pour revenir</div>
 
   <div id="topbar">
     <div class="title">
@@ -4426,6 +4437,12 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
   }
 
   function renderGraph(){
+    if(inFocusMode){
+      inFocusMode = false;
+      focusAnchorId = null;
+      var banner = document.getElementById("focusBanner");
+      if(banner) banner.classList.remove("show");
+    }
     cy.elements().remove();
     var nodes = allNodes();
     document.getElementById("empty").classList.toggle("show", nodes.length===0);
@@ -4606,16 +4623,75 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
   }
 
   var justHeld = false;
+  var currentHighlightId = null;
+  var inFocusMode = false;
+  var focusAnchorId = null;
+
+  function subgraphOf(id){
+    var startNode = cy.getElementById(id);
+    if(startNode.empty()) return null;
+    return startNode.union(startNode.predecessors()).union(startNode.successors());
+  }
+
+  function enterFocusMode(id){
+    var subgraph = subgraphOf(id);
+    if(!subgraph) return;
+    inFocusMode = true;
+    focusAnchorId = id;
+    document.getElementById("focusBanner").classList.add("show");
+    cy.batch(function(){
+      cy.elements().not(subgraph).remove();
+      cy.elements().removeClass("dimmed highlighted");
+    });
+    cy.layout({
+      name: "dagre", rankDir: "LR", nodeSep: 30, rankSep: 80,
+      animate: true, animationDuration: 350, fit: true, padding: 60
+    }).run();
+  }
+
+  function exitFocusMode(){
+    inFocusMode = false;
+    focusAnchorId = null;
+    document.getElementById("focusBanner").classList.remove("show");
+    renderGraph();
+  }
+
   cy.on("taphold", "node", function(evt){
     justHeld = true;
     showDetail(evt.target.id());
   });
+
   cy.on("tap", "node", function(evt){
     if(justHeld){ justHeld = false; return; }
-    highlightLineage(evt.target.id());
+    var id = evt.target.id();
+
+    if(inFocusMode){
+      exitFocusMode();
+      currentHighlightId = id;
+      highlightLineage(id);
+      return;
+    }
+
+    if(currentHighlightId === id){
+      enterFocusMode(id);
+      return;
+    }
+
+    currentHighlightId = id;
+    highlightLineage(id);
   });
+
   cy.on("tap", function(evt){
-    if(evt.target === cy){ clearHighlight(); }
+    if(evt.target !== cy) return;
+    if(inFocusMode){
+      var anchor = focusAnchorId;
+      exitFocusMode();
+      currentHighlightId = anchor;
+      highlightLineage(anchor);
+      return;
+    }
+    clearHighlight();
+    currentHighlightId = null;
   });
 
   // ---------- Form sheet ----------
