@@ -56,20 +56,21 @@
     font-size:15px; letter-spacing:0.02em; color:var(--ink);
     display:flex; flex-direction:column; line-height:1.15;
   }
-  #topbar .title{ flex:none; max-width:40%; } #topbar .title .jp{ font-size:17px; font-weight:600; white-space:nowrap; }
-  #topbar .title .fr{ font-size:11px; color:var(--ink-soft); margin-top:1px; }
+  #topbar .title{ flex:none; max-width:32%; } #topbar .title .jp{ font-size:16px; font-weight:600; white-space:nowrap; }
+  #topbar .title .fr{ display:none; }
   #stats{
-    display:flex; gap:10px; pointer-events:auto;
+    display:flex; gap:6px; pointer-events:auto;
   }
   .stat{
     background: var(--paper-card);
     border:1px solid var(--border);
-    padding:5px 9px;
-    font-size:11px;
-    display:flex; align-items:center; gap:5px;
+    padding:4px 6px;
+    font-size:9.5px;
+    display:flex; align-items:center; gap:3px;
     color:var(--ink-soft);
+    white-space:nowrap;
   }
-  .stat .dot{ width:6px; height:6px; border-radius:50%; flex:none; }
+  .stat .dot{ width:5px; height:5px; border-radius:50%; flex:none; }
   .stat b{ color:var(--ink); font-weight:600; }
 
   #cy{ position:absolute; inset:0; }
@@ -4494,9 +4495,9 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     var rCount = nodes.filter(function(n){return n.type==="r";}).length;
     var learned = nodes.filter(function(n){return n.status==="learned";}).length;
     var html = "";
-    html += '<div class="stat"><span class="dot" style="background:#2B3A55"></span>'+kCount+' <span style="opacity:.7">漢字</span></div>';
-    html += '<div class="stat"><span class="dot" style="background:#9a9384"></span>'+rCount+' <span style="opacity:.7">部首</span></div>';
-    html += '<div class="stat"><span class="dot" style="background:#A6332B"></span><b>'+learned+'</b> appris</div>';
+    html += '<div class="stat" title="Kanjis"><span class="dot" style="background:#2B3A55"></span>'+kCount+'</div>';
+    html += '<div class="stat" title="Radicaux"><span class="dot" style="background:#9a9384"></span>'+rCount+'</div>';
+    html += '<div class="stat" title="Appris"><span class="dot" style="background:#A6332B"></span><b>'+learned+'</b></div>';
     document.getElementById("stats").innerHTML = html;
   }
 
