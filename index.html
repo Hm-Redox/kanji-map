@@ -301,6 +301,16 @@
   .deck-head button{ background:none; border:none; font-size:20px; color:var(--ink); cursor:pointer; padding:2px 4px; }
   .deck-head h2{ margin:0; font-size:16px; font-weight:600; }
   #deckBody{ flex:1; overflow-y:auto; padding:20px; }
+  .deck-cat-btn{
+    display:flex; justify-content:space-between; align-items:center; width:100%;
+    padding:14px 16px; margin-bottom:8px; border:1px solid var(--border); border-radius:6px;
+    background:var(--paper-card); font-size:14.5px; color:var(--ink); cursor:pointer;
+  }
+  .deck-cat-btn:disabled{ opacity:0.4; }
+  .deck-cat-count{
+    background:var(--paper); border-radius:10px; padding:2px 9px; font-size:12px; color:var(--ink-soft);
+  }
+  .review-kanji.custom{ font-family:inherit; font-style:italic; font-size:34px; color:var(--indigo); }
   .btn{
     flex:1; padding:12px; text-align:center; font-size:13.5px; font-weight:600;
     border-radius:3px; border:none; cursor:pointer;
@@ -5204,11 +5214,24 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
       variantParents: pendingVariants.slice(),
       image: pendingImage,
       status: existing.status || "unknown",
+      srs: existing.srs || null,
       reviewed: true
     };
     save();
     closeSheets();
     renderGraph();
+
+    // If this node was being edited from within a Deck review session, refresh that card's data
+    // (its object reference was just replaced in state.nodes) instead of losing the in-progress SRS update.
+    if(deckEditingReturnId === id){
+      deckEditingReturnId = null;
+      if(reviewQueue[reviewIndex] && reviewQueue[reviewIndex].id === id){
+        reviewQueue[reviewIndex] = state.nodes[id];
+      }
+      viewDeck.classList.add("show");
+      renderReviewCard();
+      return;
+    }
 
     // Briefly highlight the newly saved node and its links so it's easy to spot, then fade back to normal
     currentHighlightId = id;
@@ -5344,22 +5367,35 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     renderGraph();
   });
 
-  // ---------- Review (Anki-like spaced repetition, kanji only) ----------
+  // ---------- Review (Anki-like spaced repetition) ----------
   var SRS_MATURE_DAYS = 21;
   var deckBody = document.getElementById("deckBody");
   var reviewQueue = [];
   var reviewIndex = 0;
   var reviewRevealed = false;
+  var deckScreen = "menu"; // "menu" | "review"
+  var deckEditingReturnId = null;
+
+  var DECK_CATEGORIES = [
+    { key: "r", label: "Radicaux" },
+    { key: "N5", label: "N5" },
+    { key: "N4", label: "N4" },
+    { key: "N3", label: "N3" },
+    { key: "N2-N1", label: "N2-N1" }
+  ];
 
   function ensureSrs(n){
     if(!n.srs){ n.srs = { interval: 0, ease: 2.5, due: Date.now(), reps: 0 }; }
     return n.srs;
   }
 
-  function dueKanji(){
+  function dueForCategory(catKey){
     var now = Date.now();
     return allNodes().filter(function(n){
-      return n.type === "k" && n.reviewed !== false && (!n.srs || n.srs.due <= now);
+      if(n.reviewed === false) return false;
+      if(n.srs && n.srs.due > now) return false;
+      if(catKey === "r") return n.type === "r";
+      return n.type === "k" && n.jlpt === catKey;
     });
   }
 
@@ -5390,16 +5426,46 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     save();
   }
 
+  function renderDeckMenu(){
+    deckScreen = "menu";
+    var html = '<div style="margin-bottom:14px; font-size:13px; color:var(--ink-soft);">Choisis quoi réviser :</div>';
+    DECK_CATEGORIES.forEach(function(c){
+      var count = dueForCategory(c.key).length;
+      html += '<button class="deck-cat-btn" data-cat="'+c.key+'"'+(count===0?' disabled':'')+'>'
+            + '<span>'+c.label+'</span><span class="deck-cat-count">'+count+'</span></button>';
+    });
+    deckBody.innerHTML = html;
+    document.querySelectorAll(".deck-cat-btn:not([disabled])").forEach(function(b){
+      b.addEventListener("click", function(){ startReview(b.getAttribute("data-cat")); });
+    });
+  }
+
+  function startReview(catKey){
+    reviewQueue = dueForCategory(catKey);
+    reviewIndex = 0;
+    deckScreen = "review";
+    renderReviewCard();
+  }
+
+  function reviewFrontHtml(n){
+    if(n.image) return '<img src="'+n.image+'" style="max-width:140px; max-height:140px;">';
+    return esc(labelOf(n));
+  }
+
   function renderReviewCard(){
     if(reviewIndex >= reviewQueue.length){
-      deckBody.innerHTML = '<div class="review-empty">Terminé pour aujourd\'hui ✓<br>Reviens plus tard pour la suite, ou ajoute d\'autres kanjis à ta carte.</div>';
+      deckBody.innerHTML = '<div class="review-empty">Terminé pour cette catégorie ✓<br>Reviens plus tard, ou choisis autre chose.</div>'
+        + '<button class="review-flip" id="btnBackToMenu" style="margin-top:16px;">← Choisir une autre catégorie</button>';
+      document.getElementById("btnBackToMenu").addEventListener("click", renderDeckMenu);
+      deckScreen = "review";
       return;
     }
     var n = reviewQueue[reviewIndex];
     reviewRevealed = false;
 
+    var isCustomText = !n.char && !n.image;
     var html = '<div class="review-progress">'+(reviewIndex+1)+' / '+reviewQueue.length+'</div>';
-    html += '<div class="review-kanji">'+esc(n.char)+'</div>';
+    html += '<div class="review-kanji'+(isCustomText?' custom':'')+'">'+reviewFrontHtml(n)+'</div>';
     html += '<div id="reviewBack" style="display:none;"></div>';
     html += '<button class="review-flip" id="btnFlip">Retourner la carte</button>';
     html += '<div class="review-ratings" id="reviewRatings" style="display:none;">'
@@ -5414,11 +5480,16 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
       reviewRevealed = true;
       var backHtml = '<div class="review-back">';
       backHtml += '<div class="row"><span class="k">Sens</span><span class="v">'+esc(n.meaning||"—")+'</span></div>';
-      backHtml += '<div class="row"><span class="k">On\'yomi</span><span class="v">'+esc(n.onyomi||"—")+'</span></div>';
-      backHtml += '<div class="row"><span class="k">Kun\'yomi</span><span class="v">'+esc(n.kunyomi||"—")+'</span></div>';
-      backHtml += '<div class="row"><span class="k">JLPT</span><span class="v">'+esc(n.jlpt||"—")+'</span></div>';
+      if(n.type === "k"){
+        backHtml += '<div class="row"><span class="k">On\'yomi</span><span class="v">'+esc(n.onyomi||"—")+'</span></div>';
+        backHtml += '<div class="row"><span class="k">Kun\'yomi</span><span class="v">'+esc(n.kunyomi||"—")+'</span></div>';
+        backHtml += '<div class="row"><span class="k">JLPT</span><span class="v">'+esc(n.jlpt||"—")+'</span></div>';
+      }
       if(n.mnemonic){ backHtml += '<div class="mnemonic">'+esc(n.mnemonic)+'</div>'; }
-      backHtml += '<span class="review-link" id="reviewGoto">Voir sur la carte →</span>';
+      backHtml += '<div style="display:flex; gap:16px; justify-content:center; margin-top:14px;">';
+      backHtml += '<span class="review-link" id="reviewGoto">Voir sur la map →</span>';
+      backHtml += '<span class="review-link" id="reviewEdit">Modifier la fiche ✎</span>';
+      backHtml += '</div>';
       backHtml += '</div>';
       document.getElementById("reviewBack").innerHTML = backHtml;
       document.getElementById("reviewBack").style.display = "";
@@ -5428,6 +5499,10 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
       document.getElementById("reviewGoto").addEventListener("click", function(){
         switchView("map");
         setTimeout(function(){ enterFocusMode(n.id); }, 200);
+      });
+      document.getElementById("reviewEdit").addEventListener("click", function(){
+        deckEditingReturnId = n.id;
+        openForm(n.id);
       });
     });
 
@@ -5441,12 +5516,16 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
   }
 
   function openDeck(){
-    reviewQueue = dueKanji();
-    reviewIndex = 0;
-    renderReviewCard();
+    renderDeckMenu();
   }
 
-  document.getElementById("btnDeckBack").addEventListener("click", function(){ switchView("map"); });
+  document.getElementById("btnDeckBack").addEventListener("click", function(){
+    if(deckScreen === "review"){
+      renderDeckMenu();
+    } else {
+      switchView("map");
+    }
+  });
 
   // ---------- Navigation drawer & view switching ----------
   var drawer = document.getElementById("drawer");
