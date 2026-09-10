@@ -239,6 +239,68 @@
     box-shadow: var(--shadow); z-index:60; padding:4px 12px; display:none;
   }
   .results-overlay.show{ display:block; }
+
+  .review-progress{ text-align:center; font-size:12px; color:var(--ink-soft); margin-bottom:6px; }
+  .review-kanji{
+    text-align:center; font-size:88px; margin: 18px 0; font-family:var(--kanji-display);
+    color:var(--ink);
+  }
+  .review-back{ padding:0 4px 8px; }
+  .review-back .row{
+    display:flex; justify-content:space-between; padding:9px 0; border-bottom:1px solid var(--paper-line);
+    font-size:13.5px;
+  }
+  .review-back .row .k{ color:var(--ink-soft); }
+  .review-back .mnemonic{
+    margin-top:10px; padding:12px; background:var(--paper); border-radius:3px; font-size:13px;
+    line-height:1.55; color:var(--ink-soft); font-style:italic; white-space:pre-wrap;
+  }
+  .review-link{
+    display:block; text-align:center; margin-top:14px; font-size:12.5px; color:var(--indigo);
+    text-decoration:underline; cursor:pointer;
+  }
+  .review-ratings{ display:flex; gap:8px; margin-top:18px; }
+  .review-ratings button{
+    flex:1; padding:11px 4px; border:none; border-radius:3px; font-size:12px; font-weight:600; color:#F1ECDD; cursor:pointer;
+  }
+  .review-flip{
+    display:block; width:100%; padding:13px; margin-top:18px; border:none; border-radius:3px;
+    background:var(--indigo); color:#F1ECDD; font-size:14px; font-weight:600; cursor:pointer;
+  }
+  .review-empty{ text-align:center; padding:40px 20px; color:var(--ink-soft); font-size:13.5px; line-height:1.6; }
+
+  /* --- Navigation drawer --- */
+  #drawer{
+    position:absolute; top:0; left:0; bottom:0; width:76%; max-width:290px;
+    background:var(--paper-card); z-index:71; transform:translateX(-100%);
+    transition:transform .25s cubic-bezier(.32,.72,0,1);
+    box-shadow: var(--shadow); display:flex; flex-direction:column;
+  }
+  #drawer.show{ transform:translateX(0); }
+  .drawer-head{ padding:22px 20px 16px; border-bottom:1px solid var(--border); }
+  .drawer-head .jp{ font-size:22px; font-weight:600; color:var(--ink); }
+  .drawer-head .sub{ font-size:11px; color:var(--ink-soft); margin-top:3px; }
+  #drawer nav{ padding:10px 10px; display:flex; flex-direction:column; gap:3px; }
+  .drawer-item{
+    display:flex; align-items:center; gap:10px; text-align:left;
+    background:none; border:none; padding:12px 12px; border-radius:6px;
+    font-size:14.5px; color:var(--ink); cursor:pointer;
+  }
+  .drawer-item.active{ background:var(--paper); font-weight:600; }
+
+  /* --- Full-screen Deck view --- */
+  #viewDeck{
+    position:absolute; inset:0; z-index:25; background:var(--paper);
+    display:none; flex-direction:column;
+  }
+  #viewDeck.show{ display:flex; }
+  .deck-head{
+    display:flex; align-items:center; gap:12px; padding:16px 16px 14px;
+    border-bottom:1px solid var(--border); flex:none;
+  }
+  .deck-head button{ background:none; border:none; font-size:20px; color:var(--ink); cursor:pointer; padding:2px 4px; }
+  .deck-head h2{ margin:0; font-size:16px; font-weight:600; }
+  #deckBody{ flex:1; overflow-y:auto; padding:20px; }
   .btn{
     flex:1; padding:12px; text-align:center; font-size:13.5px; font-weight:600;
     border-radius:3px; border:none; cursor:pointer;
@@ -295,15 +357,37 @@
   <div id="mapSearchList" class="results-overlay"></div>
   <div id="libList" class="results-overlay"></div>
 
+  <!-- Navigation drawer -->
+  <div class="sheet-backdrop" id="drawerBackdrop" style="z-index:70;"></div>
+  <div id="drawer">
+    <div class="drawer-head">
+      <div class="jp kanji-font">組み立て</div>
+      <div class="sub">construire, assembler</div>
+    </div>
+    <nav>
+      <button class="drawer-item active" data-view="map">🗺️ <span>Carte</span></button>
+      <button class="drawer-item" data-view="deck">🎴 <span>Deck</span></button>
+    </nav>
+  </div>
+
+  <!-- Full-screen Deck view -->
+  <div id="viewDeck">
+    <div class="deck-head">
+      <button id="btnDeckBack">←</button>
+      <h2>Deck</h2>
+    </div>
+    <div id="deckBody"></div>
+  </div>
+
   <div id="topbar">
-    <div class="title">
+    <button id="btnDrawer" class="title" style="background:none; border:none; text-align:left; padding:0; cursor:pointer; pointer-events:auto;">
       <span class="jp kanji-font">組み立て</span>
       <span class="fr">ta carte de kanjis</span>
-    </div>
-    <div style="display:flex; align-items:center; gap:8px; pointer-events:auto;">
-      <button id="btnFont" style="background:var(--paper-card); border:1px solid var(--border); border-radius:50%; width:30px; height:30px; font-size:14px; cursor:pointer; font-weight:600;">Aa</button>
-      <button id="btnMapSearch" style="background:var(--paper-card); border:1px solid var(--border); border-radius:50%; width:30px; height:30px; font-size:15px; cursor:pointer;">🔍</button>
-      <button id="btnLibrary" style="background:var(--paper-card); border:1px solid var(--border); border-radius:50%; width:30px; height:30px; font-size:16px; cursor:pointer;">📚</button>
+    </button>
+    <div style="display:flex; align-items:center; gap:5px; pointer-events:auto;">
+      <button id="btnFont" style="background:var(--paper-card); border:1px solid var(--border); border-radius:50%; width:28px; height:28px; font-size:13px; cursor:pointer; font-weight:600;">Aa</button>
+      <button id="btnMapSearch" style="background:var(--paper-card); border:1px solid var(--border); border-radius:50%; width:28px; height:28px; font-size:14px; cursor:pointer;">🔍</button>
+      <button id="btnLibrary" style="background:var(--paper-card); border:1px solid var(--border); border-radius:50%; width:28px; height:28px; font-size:15px; cursor:pointer;">📚</button>
       <div id="stats"></div>
     </div>
   </div>
@@ -5258,6 +5342,146 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     localStorage.setItem(FONT_KEY, next);
     applyFontPref();
     renderGraph();
+  });
+
+  // ---------- Review (Anki-like spaced repetition, kanji only) ----------
+  var SRS_MATURE_DAYS = 21;
+  var deckBody = document.getElementById("deckBody");
+  var reviewQueue = [];
+  var reviewIndex = 0;
+  var reviewRevealed = false;
+
+  function ensureSrs(n){
+    if(!n.srs){ n.srs = { interval: 0, ease: 2.5, due: Date.now(), reps: 0 }; }
+    return n.srs;
+  }
+
+  function dueKanji(){
+    var now = Date.now();
+    return allNodes().filter(function(n){
+      return n.type === "k" && n.reviewed !== false && (!n.srs || n.srs.due <= now);
+    });
+  }
+
+  function applySrsRating(n, rating){
+    var srs = ensureSrs(n);
+    if(n.status === "unknown") n.status = "in_progress";
+
+    if(rating === "again"){
+      srs.reps = 0;
+      srs.interval = 1;
+      srs.ease = Math.max(1.3, srs.ease - 0.2);
+    } else if(rating === "hard"){
+      srs.interval = Math.max(1, Math.round((srs.interval || 1) * 1.2));
+      srs.ease = Math.max(1.3, srs.ease - 0.15);
+      srs.reps += 1;
+    } else if(rating === "good"){
+      if(srs.reps === 0) srs.interval = 1;
+      else if(srs.reps === 1) srs.interval = 6;
+      else srs.interval = Math.round(srs.interval * srs.ease);
+      srs.reps += 1;
+    } else if(rating === "easy"){
+      srs.interval = Math.round((srs.interval || 1) * srs.ease * 1.3) || 4;
+      srs.ease = srs.ease + 0.15;
+      srs.reps += 1;
+    }
+    srs.due = Date.now() + srs.interval * 24 * 60 * 60 * 1000;
+    if(srs.interval >= SRS_MATURE_DAYS){ n.status = "learned"; }
+    save();
+  }
+
+  function renderReviewCard(){
+    if(reviewIndex >= reviewQueue.length){
+      deckBody.innerHTML = '<div class="review-empty">Terminé pour aujourd\'hui ✓<br>Reviens plus tard pour la suite, ou ajoute d\'autres kanjis à ta carte.</div>';
+      return;
+    }
+    var n = reviewQueue[reviewIndex];
+    reviewRevealed = false;
+
+    var html = '<div class="review-progress">'+(reviewIndex+1)+' / '+reviewQueue.length+'</div>';
+    html += '<div class="review-kanji">'+esc(n.char)+'</div>';
+    html += '<div id="reviewBack" style="display:none;"></div>';
+    html += '<button class="review-flip" id="btnFlip">Retourner la carte</button>';
+    html += '<div class="review-ratings" id="reviewRatings" style="display:none;">'
+          + '<button data-rating="again" style="background:#9a9384;">À revoir</button>'
+          + '<button data-rating="hard" style="background:#B58A5C;">Difficile</button>'
+          + '<button data-rating="good" style="background:var(--indigo);">Correct</button>'
+          + '<button data-rating="easy" style="background:var(--seal);">Facile</button>'
+          + '</div>';
+    deckBody.innerHTML = html;
+
+    document.getElementById("btnFlip").addEventListener("click", function(){
+      reviewRevealed = true;
+      var backHtml = '<div class="review-back">';
+      backHtml += '<div class="row"><span class="k">Sens</span><span class="v">'+esc(n.meaning||"—")+'</span></div>';
+      backHtml += '<div class="row"><span class="k">On\'yomi</span><span class="v">'+esc(n.onyomi||"—")+'</span></div>';
+      backHtml += '<div class="row"><span class="k">Kun\'yomi</span><span class="v">'+esc(n.kunyomi||"—")+'</span></div>';
+      backHtml += '<div class="row"><span class="k">JLPT</span><span class="v">'+esc(n.jlpt||"—")+'</span></div>';
+      if(n.mnemonic){ backHtml += '<div class="mnemonic">'+esc(n.mnemonic)+'</div>'; }
+      backHtml += '<span class="review-link" id="reviewGoto">Voir sur la carte →</span>';
+      backHtml += '</div>';
+      document.getElementById("reviewBack").innerHTML = backHtml;
+      document.getElementById("reviewBack").style.display = "";
+      document.getElementById("btnFlip").style.display = "none";
+      document.getElementById("reviewRatings").style.display = "";
+
+      document.getElementById("reviewGoto").addEventListener("click", function(){
+        switchView("map");
+        setTimeout(function(){ enterFocusMode(n.id); }, 200);
+      });
+    });
+
+    document.querySelectorAll("#reviewRatings [data-rating]").forEach(function(b){
+      b.addEventListener("click", function(){
+        applySrsRating(n, b.getAttribute("data-rating"));
+        reviewIndex++;
+        renderReviewCard();
+      });
+    });
+  }
+
+  function openDeck(){
+    reviewQueue = dueKanji();
+    reviewIndex = 0;
+    renderReviewCard();
+  }
+
+  document.getElementById("btnDeckBack").addEventListener("click", function(){ switchView("map"); });
+
+  // ---------- Navigation drawer & view switching ----------
+  var drawer = document.getElementById("drawer");
+  var drawerBackdrop = document.getElementById("drawerBackdrop");
+  var viewDeck = document.getElementById("viewDeck");
+
+  function openDrawer(){
+    drawer.classList.add("show");
+    drawerBackdrop.classList.add("show");
+  }
+  function closeDrawer(){
+    drawer.classList.remove("show");
+    drawerBackdrop.classList.remove("show");
+  }
+  document.getElementById("btnDrawer").addEventListener("click", openDrawer);
+  drawerBackdrop.addEventListener("click", closeDrawer);
+
+  function switchView(view){
+    closeSheets();
+    document.querySelectorAll(".drawer-item").forEach(function(b){
+      b.classList.toggle("active", b.getAttribute("data-view") === view);
+    });
+    if(view === "deck"){
+      viewDeck.classList.add("show");
+      openDeck();
+    } else {
+      viewDeck.classList.remove("show");
+    }
+  }
+
+  document.querySelectorAll(".drawer-item").forEach(function(b){
+    b.addEventListener("click", function(){
+      switchView(b.getAttribute("data-view"));
+      closeDrawer();
+    });
   });
 
   // ---------- init ----------
