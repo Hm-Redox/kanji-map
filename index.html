@@ -11120,9 +11120,9 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     var id = evt.target.id();
 
     if(inFocusMode){
-      exitFocusMode();
-      currentHighlightId = id;
-      highlightLineage(id);
+      if(id === focusAnchorId) return; // tapping the current anchor again does nothing here
+      renderGraph(); // rebuild the full graph so the new anchor's complete lineage is available
+      enterFocusMode(id);
       return;
     }
 
