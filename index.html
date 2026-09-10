@@ -10747,7 +10747,7 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
           "border-width": function(n){ return n.data("type")==="k" ? 2 : 1.5; },
           "border-style": function(n){ return n.data("type")==="k" ? "solid" : "dashed"; },
           "border-color": function(n){ return statusColor(n.data("status")); },
-          "label": function(n){ return n.data("hasImage") ? n.data("label") : n.data("label"); },
+          "label": function(n){ return n.data("hasImage") ? "" : n.data("label"); },
           "font-family": function(n){ return n.data("isCustom") ? "-apple-system, Segoe UI, Roboto, sans-serif" : kanjiFontStack(); },
           "font-size": function(n){ return n.data("hasImage") ? 9.5 : (n.data("isCustom") ? 11 : (n.data("type")==="k" ? 24 : 18)); },
           "font-style": function(n){ return n.data("isCustom") ? "italic" : "normal"; },
