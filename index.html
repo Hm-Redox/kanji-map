@@ -10817,6 +10817,48 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     }
   }
 
+  // Packs whole disconnected groups (clusters with no shared kanji/link between them) tightly
+  // side by side with a controlled, exact gap — instead of relying on unpredictable physics
+  // to decide how close separate groups end up.
+  function packComponents(gap){
+    var comps = cy.elements().components();
+    if(comps.length < 2) return;
+
+    var boxes = comps.map(function(comp){
+      var nodes = comp.nodes();
+      var minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+      nodes.forEach(function(n){
+        var p = n.position(), w = n.outerWidth(), h = n.outerHeight();
+        minX = Math.min(minX, p.x - w/2);
+        maxX = Math.max(maxX, p.x + w/2);
+        minY = Math.min(minY, p.y - h/2);
+        maxY = Math.max(maxY, p.y + h/2);
+      });
+      return { nodes: nodes, minX: minX, minY: minY, w: maxX-minX, h: maxY-minY };
+    });
+
+    boxes.sort(function(a,b){ return b.h - a.h; });
+
+    var totalArea = boxes.reduce(function(s,b){ return s + b.w*b.h; }, 0);
+    var targetRowWidth = Math.max(500, Math.sqrt(totalArea) * 1.4);
+
+    var x = 0, y = 0, rowHeight = 0;
+    boxes.forEach(function(b){
+      if(x > 0 && x + b.w > targetRowWidth){
+        x = 0;
+        y += rowHeight + gap;
+        rowHeight = 0;
+      }
+      var dx = x - b.minX, dy = y - b.minY;
+      b.nodes.forEach(function(n){
+        var p = n.position();
+        n.position({ x: p.x + dx, y: p.y + dy });
+      });
+      x += b.w + gap;
+      rowHeight = Math.max(rowHeight, b.h);
+    });
+  }
+
   function relayout(){
     if(allNodes().length === 0) return;
     var pref = layoutPref();
@@ -10826,10 +10868,10 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
           animate: false,
           fit: false,
           padding: 60,
-          idealEdgeLength: 15,
-          nodeRepulsion: 5000,
-          gravity: 2,
-          gravityRange: 0.8,
+          idealEdgeLength: 2,
+          nodeRepulsion: 100,
+          gravity: 6,
+          gravityRange: 2,
           numIter: 2500,
           randomize: true,
           nodeDimensionsIncludeLabels: true
@@ -10849,6 +10891,7 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     if(pref === "cose"){
       cy.one("layoutstop", function(){
         resolveOverlaps(16);
+        packComponents(35);
         cy.animate({ fit: { eles: cy.elements(), padding: 60 }, duration: 300 });
       });
     }
