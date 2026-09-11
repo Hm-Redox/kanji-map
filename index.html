@@ -300,7 +300,15 @@
   }
   .deck-head button{ background:none; border:none; font-size:20px; color:var(--ink); cursor:pointer; padding:2px 4px; }
   .deck-head h2{ margin:0; font-size:16px; font-weight:600; }
-  #deckBody{ flex:1; overflow-y:auto; padding:20px; }
+  #deckBody, #hiddenBody{ flex:1; overflow-y:auto; padding:20px; }
+  .hidden-row{
+    display:flex; align-items:center; gap:12px; padding:10px 4px; border-bottom:1px solid var(--paper-line);
+  }
+  .hidden-row .info{ flex:1; min-width:0; font-size:13.5px; }
+  .hidden-row button{
+    flex:none; padding:6px 12px; border:1px solid var(--indigo); border-radius:3px;
+    background:none; color:var(--indigo); font-size:12px; cursor:pointer;
+  }
   .deck-cat-btn{
     display:flex; justify-content:space-between; align-items:center; width:100%;
     padding:14px 16px; margin-bottom:8px; border:1px solid var(--border); border-radius:6px;
@@ -399,6 +407,7 @@
       <button id="btnFont" style="background:var(--paper-card); border:1px solid var(--border); border-radius:50%; width:28px; height:28px; font-size:13px; cursor:pointer; font-weight:600;">Aa</button>
       <button id="btnMapSearch" style="background:var(--paper-card); border:1px solid var(--border); border-radius:50%; width:28px; height:28px; font-size:14px; cursor:pointer;">🔍</button>
       <button id="btnLibrary" style="background:var(--paper-card); border:1px solid var(--border); border-radius:50%; width:28px; height:28px; font-size:15px; cursor:pointer;">📚</button>
+      <button id="btnHidden" style="background:var(--paper-card); border:1px solid var(--border); border-radius:50%; width:28px; height:28px; font-size:14px; cursor:pointer;">🙈</button>
       <div id="stats"></div>
     </div>
   </div>
@@ -438,6 +447,10 @@
           <button data-status="learned"><span class="dot" style="background:var(--seal)"></span>Appris</button>
         </div>
       </div>
+      <button class="drawer-item" id="btnToggleHideMap" style="width:100%; border:1px solid var(--border); border-radius:3px; margin-top:6px; justify-content:space-between;">
+        <span>👁️ Masquer sur la carte</span>
+        <span id="hideMapState" style="font-size:11px; color:var(--ink-soft);">Non</span>
+      </button>
       <div class="btn-row">
         <button class="btn btn-ghost" id="btnEdit">Modifier</button>
         <button class="btn btn-danger" id="btnDelete">Supprimer</button>
@@ -456,6 +469,18 @@
       <div class="field">
         <input type="text" id="mapSearchInput" placeholder="Chercher un caractère ou un sens…">
       </div>
+    </div>
+  </div>
+
+  <!-- Hidden components sheet (manage components hidden from the map) -->
+  <div class="sheet" id="sheetHidden" style="max-height:80%;">
+    <div class="sheet-handle"></div>
+    <div class="sheet-scroll">
+      <div class="sheet-header">
+        <h3>Composants masqués</h3>
+        <button class="sheet-close" data-close>✕</button>
+      </div>
+      <div id="hiddenBody"></div>
     </div>
   </div>
 
@@ -558,6 +583,13 @@
       <div class="field">
         <label>Mnémonique / notes perso</label>
         <textarea id="fMnemonic" placeholder="Ton moyen mnémotechnique…"></textarea>
+      </div>
+
+      <div class="field">
+        <label style="display:flex; align-items:center; gap:9px; cursor:pointer; margin-bottom:0;">
+          <input type="checkbox" id="fHideFromMap" style="width:auto; margin:0;">
+          <span>Masquer sur la carte (utile pour un composant très courant, ex : un simple trait)<br><span style="color:var(--ink-soft); font-weight:400;">reste disponible pour l'étude et le Deck, seuls lui et ses liens disparaissent de la carte</span></span>
+        </label>
       </div>
 
       <div class="btn-row">
@@ -10906,14 +10938,15 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
       if(banner) banner.classList.remove("show");
     }
     cy.elements().remove();
-    var nodes = allNodes();
-    document.getElementById("empty").classList.toggle("show", nodes.length===0);
+    var allTheNodes = allNodes();
+    var nodes = allTheNodes.filter(function(n){ return !n.hiddenFromMap; });
+    document.getElementById("empty").classList.toggle("show", allTheNodes.length===0);
     nodes.forEach(function(n){
       cy.add({ group:"nodes", data:{ id:n.id, char:n.char, label:labelOf(n), isCustom:!!n.isCustom, hasImage:!!n.image, image:n.image||"", type:n.type, status:n.status, unreviewed: n.reviewed===false, bgColor: jlptColor(n.jlpt) } });
     });
     nodes.forEach(function(n){
       (n.parents||[]).forEach(function(p){
-        if(state.nodes[p]){
+        if(state.nodes[p] && !state.nodes[p].hiddenFromMap){
           cy.add({ group:"edges", data:{ id:p+"__"+n.id, source:p, target:n.id, variant: (n.variantParents||[]).indexOf(p)!==-1 } });
         }
       });
@@ -11001,6 +11034,9 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     if(n.reviewed === false){
       html += '<div style="background:#F0E8D8; border:1px dotted var(--border); border-radius:3px; padding:8px 10px; font-size:12px; color:var(--ink-soft); margin-bottom:10px;">Ajouté automatiquement comme composant — tu n\'as pas encore donné/vérifié son sens toi-même. Modifie-le pour le valider.</div>';
     }
+    if(n.hiddenFromMap){
+      html += '<div style="background:#E4DFCE; border:1px dashed var(--border); border-radius:3px; padding:8px 10px; font-size:12px; color:var(--ink-soft); margin-bottom:10px;">Masqué sur la carte — lui et ses liens n\'apparaissent pas sur le graphe, mais il reste disponible pour l\'étude. Modifie-le pour le réafficher.</div>';
+    }
     html += n.image
       ? '<div style="text-align:center; margin:4px 0 10px;"><img src="'+n.image+'" style="max-width:140px; max-height:140px; border:1px solid var(--border); border-radius:3px; background:#fff;">'
         + (n.char ? '' : '<div style="margin-top:6px; font-style:italic; color:var(--indigo); font-size:14px;">'+esc(n.meaning||"")+'</div>')
@@ -11042,8 +11078,21 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
       b.classList.toggle("active", b.getAttribute("data-status")===n.status);
     });
 
+    var hideBtn = document.getElementById("hideMapState");
+    hideBtn.textContent = n.hiddenFromMap ? "Oui" : "Non";
+    hideBtn.style.color = n.hiddenFromMap ? "var(--seal)" : "var(--ink-soft)";
+
     openSheet(sheetDetail);
   }
+
+  document.getElementById("btnToggleHideMap").addEventListener("click", function(){
+    var n = state.nodes[currentDetailId];
+    if(!n) return;
+    n.hiddenFromMap = !n.hiddenFromMap;
+    save();
+    renderGraph();
+    showDetail(currentDetailId);
+  });
 
   document.querySelectorAll("#statusToggle button").forEach(function(b){
     b.addEventListener("click", function(){
@@ -11460,6 +11509,7 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
       pendingVariants = (n.variantParents||[]).slice();
       fImage.value = "";
       setPreview(n.image || null);
+      document.getElementById("fHideFromMap").checked = !!n.hiddenFromMap;
     } else if(draft){
       var draftIsRadical = draft.isRadicalDraft === true;
       document.getElementById("formTitle").textContent = draftIsRadical ? "Étudier ce radical" : "Étudier ce kanji";
@@ -11474,6 +11524,7 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
       fMnemonic.value = "";
       fImage.value = "";
       setPreview(null);
+      document.getElementById("fHideFromMap").checked = false;
       // Pre-fill known component radicals from the decomposition data (auto-promoting them, like manual search does)
       var comps = draftIsRadical ? [] : (SEED_DECOMP[draft.char] || []);
       comps.forEach(function(c){
@@ -11493,6 +11544,7 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
       fJlpt.value=""; fMnemonic.value="";
       fImage.value = "";
       setPreview(null);
+      document.getElementById("fHideFromMap").checked = false;
     }
     renderParentList();
     closeSheets();
@@ -11550,6 +11602,7 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
       image: pendingImage,
       status: existing.status || "unknown",
       srs: existing.srs || null,
+      hiddenFromMap: document.getElementById("fHideFromMap").checked,
       reviewed: true
     };
     save();
@@ -11713,6 +11766,7 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     items.forEach(function(n){
       html += '<div class="lib-row" data-goto-map="'+esc(n.id)+'">'+chSpanOf(n)
             + '<span class="info"><span class="m">'+esc(sideTextOf(n) || labelOf(n))+'</span></span>'
+            + (n.hiddenFromMap ? '<span class="jlpt-badge" title="Masqué sur la carte">masqué</span>' : '')
             + '</div>';
     });
     if(items.length === 0){ html = '<div class="empty-msg">Rien sur ta carte pour l\'instant.</div>'; }
@@ -11722,7 +11776,11 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
       el.addEventListener("click", function(){
         var id = el.getAttribute("data-goto-map");
         closeSheets();
-        setTimeout(function(){ highlightLineage(id); }, 200);
+        if(state.nodes[id] && state.nodes[id].hiddenFromMap){
+          setTimeout(function(){ showDetail(id); }, 200);
+        } else {
+          setTimeout(function(){ highlightLineage(id); }, 200);
+        }
       });
     });
   }
@@ -11930,6 +11988,9 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
   var drawer = document.getElementById("drawer");
   var drawerBackdrop = document.getElementById("drawerBackdrop");
   var viewDeck = document.getElementById("viewDeck");
+  var hiddenBody = document.getElementById("hiddenBody");
+  var sheetHidden = document.getElementById("sheetHidden");
+  var HIDDEN_SNAPSHOT_KEY = "kanjimap_hidden_snapshot";
 
   function openDrawer(){
     drawer.classList.add("show");
@@ -11942,16 +12003,116 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
   document.getElementById("btnDrawer").addEventListener("click", openDrawer);
   drawerBackdrop.addEventListener("click", closeDrawer);
 
+  function getSnapshot(){
+    try{ return JSON.parse(localStorage.getItem(HIDDEN_SNAPSHOT_KEY) || "null"); }
+    catch(e){ return null; }
+  }
+  function setSnapshot(ids){
+    if(ids === null) localStorage.removeItem(HIDDEN_SNAPSHOT_KEY);
+    else localStorage.setItem(HIDDEN_SNAPSHOT_KEY, JSON.stringify(ids));
+  }
+
+  var HIDE_CATEGORIES = [
+    { key: "r", label: "Radicaux" },
+    { key: "N5", label: "N5" },
+    { key: "N4", label: "N4" },
+    { key: "N3", label: "N3" },
+    { key: "N2-N1", label: "N2-N1" }
+  ];
+
+  function renderHiddenList(){
+    var hidden = allNodes().filter(function(n){ return n.hiddenFromMap; });
+    var snapshot = getSnapshot();
+
+    var html = '<div style="margin-bottom:8px; font-size:12px; color:var(--ink-soft);">Masquer une catégorie entière :</div>';
+    html += '<div class="jlpt-filter" style="margin-bottom:18px;">';
+    HIDE_CATEGORIES.forEach(function(c){
+      var count = allNodes().filter(function(n){
+        if(n.hiddenFromMap) return false;
+        return c.key === "r" ? n.type === "r" : (n.type === "k" && n.jlpt === c.key);
+      }).length;
+      html += '<button type="button" data-hidecat="'+c.key+'"'+(count===0?' disabled':'')+'>'+c.label+' ('+count+')</button>';
+    });
+    html += '</div>';
+
+    html += '<div class="btn-row" style="margin-bottom:16px;">';
+    html += '<button class="btn btn-ghost" id="btnShowAllHidden"'+(hidden.length===0?' disabled':'')+'>Tout afficher</button>';
+    if(snapshot && snapshot.length){
+      html += '<button class="btn btn-primary" id="btnRestoreHidden">Restaurer l\'état précédent</button>';
+    }
+    html += '</div>';
+
+    if(hidden.length === 0){
+      html += '<div class="review-empty">Aucun composant masqué pour l\'instant.</div>';
+    } else {
+      hidden.sort(function(a,b){ return (a.meaning||"").localeCompare(b.meaning||""); });
+      hidden.forEach(function(n){
+        html += '<div class="hidden-row">'+chSpanOf(n)
+              + '<span class="info">'+esc(sideTextOf(n) || labelOf(n))+'</span>'
+              + '<button data-unhide="'+esc(n.id)+'">Afficher</button>'
+              + '</div>';
+      });
+    }
+    hiddenBody.innerHTML = html;
+
+    document.querySelectorAll("#hiddenBody [data-hidecat]").forEach(function(b){
+      b.addEventListener("click", function(){
+        var catKey = b.getAttribute("data-hidecat");
+        allNodes().forEach(function(n){
+          if(n.hiddenFromMap) return;
+          var matches = catKey === "r" ? n.type === "r" : (n.type === "k" && n.jlpt === catKey);
+          if(matches) n.hiddenFromMap = true;
+        });
+        save();
+        renderGraph();
+        renderHiddenList();
+      });
+    });
+    if(hidden.length){
+      document.getElementById("btnShowAllHidden").addEventListener("click", function(){
+        var ids = hidden.map(function(n){ return n.id; });
+        setSnapshot(ids);
+        ids.forEach(function(id){ if(state.nodes[id]) state.nodes[id].hiddenFromMap = false; });
+        save();
+        renderGraph();
+        renderHiddenList();
+      });
+    }
+    if(snapshot && snapshot.length){
+      document.getElementById("btnRestoreHidden").addEventListener("click", function(){
+        snapshot.forEach(function(id){ if(state.nodes[id]) state.nodes[id].hiddenFromMap = true; });
+        setSnapshot(null);
+        save();
+        renderGraph();
+        renderHiddenList();
+      });
+    }
+    document.querySelectorAll("#hiddenBody [data-unhide]").forEach(function(b){
+      b.addEventListener("click", function(){
+        var id = b.getAttribute("data-unhide");
+        if(state.nodes[id]) state.nodes[id].hiddenFromMap = false;
+        save();
+        renderGraph();
+        renderHiddenList();
+      });
+    });
+  }
+
+  document.getElementById("btnHidden").addEventListener("click", function(){
+    closeSheets();
+    renderHiddenList();
+    openSheet(sheetHidden);
+  });
+
   function switchView(view){
     closeSheets();
     document.querySelectorAll(".drawer-item").forEach(function(b){
       b.classList.toggle("active", b.getAttribute("data-view") === view);
     });
+    viewDeck.classList.remove("show");
     if(view === "deck"){
       viewDeck.classList.add("show");
       openDeck();
-    } else {
-      viewDeck.classList.remove("show");
     }
   }
 
