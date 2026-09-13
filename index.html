@@ -26,9 +26,6 @@
     --border: rgba(28,27,25,0.22);
     --shadow: 0 6px 20px rgba(28,27,25,0.18);
     --radius: 2px;
-    --kanji-display: "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Times New Roman", serif;
-  }
-  html.font-gothic{
     --kanji-display: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", "Noto Sans JP", -apple-system, sans-serif;
   }
   *{ box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -393,6 +390,7 @@
     <div class="deck-head">
       <button id="btnDeckBack">←</button>
       <h2>Deck</h2>
+      <span id="deckStreak" style="margin-left:auto; font-size:14px; font-weight:600; color:var(--seal); display:flex; align-items:center; gap:4px;"></span>
     </div>
     <div id="deckBody"></div>
   </div>
@@ -403,11 +401,9 @@
       <span class="fr">ta carte de kanjis</span>
     </button>
     <div style="display:flex; align-items:center; gap:4px; pointer-events:auto;">
-      <button id="btnLayout" style="background:var(--paper-card); border:1px solid var(--border); border-radius:50%; width:34px; height:34px; font-size:15px; cursor:pointer;" title="Type de disposition">🕸️</button>
-      <button id="btnFont" style="background:var(--paper-card); border:1px solid var(--border); border-radius:50%; width:34px; height:34px; font-size:15px; cursor:pointer; font-weight:600;">Aa</button>
-      <button id="btnMapSearch" style="background:var(--paper-card); border:1px solid var(--border); border-radius:50%; width:34px; height:34px; font-size:16px; cursor:pointer;">🔍</button>
-      <button id="btnLibrary" style="background:var(--paper-card); border:1px solid var(--border); border-radius:50%; width:34px; height:34px; font-size:17px; cursor:pointer;">📚</button>
-      <button id="btnHidden" style="background:var(--paper-card); border:1px solid var(--border); border-radius:50%; width:34px; height:34px; font-size:16px; cursor:pointer;">🙈</button>
+      <button id="btnMapSearch" style="background:var(--paper-card); border:1px solid var(--border); border-radius:50%; width:40px; height:40px; font-size:19px; cursor:pointer;" title="Chercher sur la carte">🔍</button>
+      <button id="btnLibrary" style="background:var(--paper-card); border:1px solid var(--border); border-radius:50%; width:40px; height:40px; font-size:20px; cursor:pointer;" title="Bibliothèque de kanjis">📚</button>
+      <button id="btnHidden" style="background:var(--paper-card); border:1px solid var(--border); border-radius:50%; width:40px; height:40px; font-size:19px; cursor:pointer;" title="Composants masqués">👁️</button>
       <div id="stats"></div>
     </div>
   </div>
@@ -10704,21 +10700,9 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
   }
 
   var STORAGE_KEY = "kanjimap_manual_v1";
-  var FONT_KEY = "kanjimap_font_pref";
   function kanjiFontStack(){
-    var pref = localStorage.getItem(FONT_KEY) || "mincho";
-    return pref === "gothic"
-      ? "Hiragino Kaku Gothic ProN, Hiragino Sans, Yu Gothic, Noto Sans JP, -apple-system, sans-serif"
-      : "Hiragino Mincho ProN, Yu Mincho, Noto Serif JP, serif";
+    return "Hiragino Kaku Gothic ProN, Hiragino Sans, Yu Gothic, Noto Sans JP, -apple-system, sans-serif";
   }
-  function applyFontPref(){
-    var pref = localStorage.getItem(FONT_KEY) || "mincho";
-    document.documentElement.classList.toggle("font-gothic", pref === "gothic");
-    var btn = document.getElementById("btnFont");
-    if(btn) btn.style.background = pref === "gothic" ? "var(--indigo)" : "var(--paper-card)";
-    if(btn) btn.style.color = pref === "gothic" ? "#F1ECDD" : "var(--ink)";
-  }
-  applyFontPref();
 
   var state = { nodes: {} }; // id(char) -> node object
   var editingId = null; // char id currently being edited, or null for new
@@ -10823,9 +10807,6 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     layout: { name: "preset" }
   });
 
-  var LAYOUT_KEY = "kanjimap_layout_pref";
-  function layoutPref(){ return localStorage.getItem(LAYOUT_KEY) || "dagre"; }
-
   function resolveOverlaps(margin){
     var nodes = cy.nodes().toArray();
     for(var iter = 0; iter < 40; iter++){
@@ -10894,40 +10875,25 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
 
   function relayout(){
     if(allNodes().length === 0) return;
-    var pref = layoutPref();
-    var layoutOptions = pref === "cose"
-      ? {
-          name: "cose-bilkent",
-          animate: false,
-          fit: false,
-          padding: 60,
-          idealEdgeLength: 2,
-          nodeRepulsion: 100,
-          gravity: 6,
-          gravityRange: 2,
-          numIter: 2500,
-          randomize: true,
-          nodeDimensionsIncludeLabels: true
-        }
-      : {
-          name: "dagre",
-          rankDir: "LR",
-          nodeSep: 26,
-          rankSep: 70,
-          edgeSep: 10,
-          animate: true,
-          animationDuration: 350,
-          fit: true,
-          padding: 60
-        };
+    var layoutOptions = {
+      name: "cose-bilkent",
+      animate: false,
+      fit: false,
+      padding: 60,
+      idealEdgeLength: 2,
+      nodeRepulsion: 100,
+      gravity: 6,
+      gravityRange: 2,
+      numIter: 2500,
+      randomize: true,
+      nodeDimensionsIncludeLabels: true
+    };
     var layout = cy.layout(layoutOptions);
-    if(pref === "cose"){
-      cy.one("layoutstop", function(){
-        resolveOverlaps(16);
-        packComponents(35);
-        cy.animate({ fit: { eles: cy.elements(), padding: 60 }, duration: 300 });
-      });
-    }
+    cy.one("layoutstop", function(){
+      resolveOverlaps(16);
+      packComponents(35);
+      cy.animate({ fit: { eles: cy.elements(), padding: 60 }, duration: 300 });
+    });
     layout.run();
   }
 
@@ -11749,6 +11715,7 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     closeSheets();
     openSheet(sheetLibrary);
     libList.classList.add("show");
+    setTimeout(function(){ libSearch.focus(); }, 300);
   });
 
   // ---------- Map search (find something already on the map) ----------
@@ -11780,7 +11747,11 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
         if(state.nodes[id] && state.nodes[id].hiddenFromMap){
           setTimeout(function(){ showDetail(id); }, 200);
         } else {
-          setTimeout(function(){ highlightLineage(id); }, 200);
+          setTimeout(function(){
+            renderGraph();
+            currentHighlightId = id;
+            enterFocusMode(id);
+          }, 200);
         }
       });
     });
@@ -11798,31 +11769,7 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     closeSheets();
     openSheet(sheetMapSearch);
     mapSearchList.classList.add("show");
-  });
-
-  document.getElementById("btnLayout").addEventListener("click", function(){
-    var current = layoutPref();
-    var next = current === "dagre" ? "cose" : "dagre";
-    localStorage.setItem(LAYOUT_KEY, next);
-    updateLayoutBtn();
-    relayout();
-  });
-  function updateLayoutBtn(){
-    var btn = document.getElementById("btnLayout");
-    var pref = layoutPref();
-    btn.textContent = pref === "cose" ? "🕸️" : "📊";
-    btn.title = pref === "cose" ? "Disposition : ressorts (tap pour hiérarchie)" : "Disposition : hiérarchie (tap pour ressorts)";
-    btn.style.background = pref === "cose" ? "var(--indigo)" : "var(--paper-card)";
-    btn.style.color = pref === "cose" ? "#F1ECDD" : "var(--ink)";
-  }
-  updateLayoutBtn();
-
-  document.getElementById("btnFont").addEventListener("click", function(){
-    var current = localStorage.getItem(FONT_KEY) || "mincho";
-    var next = current === "mincho" ? "gothic" : "mincho";
-    localStorage.setItem(FONT_KEY, next);
-    applyFontPref();
-    renderGraph();
+    setTimeout(function(){ mapSearchInput.focus(); }, 300);
   });
 
   // ---------- Review (Anki-like spaced repetition) ----------
@@ -11857,6 +11804,40 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     });
   }
 
+  var STREAK_KEY = "kanjimap_streak";
+  function dayStr(d){ return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate(); }
+  function getStreakData(){
+    try{ return JSON.parse(localStorage.getItem(STREAK_KEY)) || { count: 0, lastDate: null }; }
+    catch(e){ return { count: 0, lastDate: null }; }
+  }
+  function recordReviewActivity(){
+    var data = getStreakData();
+    var today = dayStr(new Date());
+    if(data.lastDate === today) return;
+    var yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    if(data.lastDate === dayStr(yesterday)){ data.count += 1; }
+    else{ data.count = 1; }
+    data.lastDate = today;
+    localStorage.setItem(STREAK_KEY, JSON.stringify(data));
+  }
+  function currentStreakCount(){
+    var data = getStreakData();
+    if(!data.lastDate) return 0;
+    var today = dayStr(new Date());
+    var yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    // if the last active day isn't today or yesterday, the streak has been broken
+    if(data.lastDate !== today && data.lastDate !== dayStr(yesterday)) return 0;
+    return data.count;
+  }
+  function updateStreakDisplay(){
+    var el = document.getElementById("deckStreak");
+    if(!el) return;
+    var count = currentStreakCount();
+    el.textContent = count > 0 ? ("🔥 " + count) : "";
+  }
+
   function applySrsRating(n, rating){
     var srs = ensureSrs(n);
     if(n.status === "unknown") n.status = "in_progress";
@@ -11881,6 +11862,8 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     }
     srs.due = Date.now() + srs.interval * 24 * 60 * 60 * 1000;
     if(srs.interval >= SRS_MATURE_DAYS){ n.status = "learned"; }
+    recordReviewActivity();
+    updateStreakDisplay();
     save();
   }
 
@@ -11936,12 +11919,29 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
 
     document.getElementById("btnFlip").addEventListener("click", function(){
       reviewRevealed = true;
+      var childrenOf = allNodes().filter(function(o){ return (o.parents||[]).indexOf(n.id) !== -1; });
       var backHtml = '<div class="review-back">';
       backHtml += '<div class="row"><span class="k">Sens</span><span class="v">'+esc(n.meaning||"—")+'</span></div>';
       if(n.type === "k"){
         backHtml += '<div class="row"><span class="k">On\'yomi</span><span class="v">'+esc(n.onyomi||"—")+'</span></div>';
         backHtml += '<div class="row"><span class="k">Kun\'yomi</span><span class="v">'+esc(n.kunyomi||"—")+'</span></div>';
         backHtml += '<div class="row"><span class="k">JLPT</span><span class="v">'+esc(n.jlpt||"—")+'</span></div>';
+      }
+      backHtml += '<div class="row"><span class="k">Statut</span><span class="v">'+esc(n.status==="learned"?"Appris":n.status==="in_progress"?"En cours":"Inconnu")+'</span></div>';
+      if((n.parents||[]).length){
+        backHtml += '<div style="margin-top:10px;"><span class="k" style="font-size:12px;color:var(--ink-soft)">Composé de</span><br>';
+        n.parents.forEach(function(p){
+          var pn = state.nodes[p];
+          if(pn) backHtml += '<span class="comp-tag">'+chSpanOf(pn)+esc(sideTextOf(pn))+'</span>';
+        });
+        backHtml += '</div>';
+      }
+      if(childrenOf.length){
+        backHtml += '<div style="margin-top:10px;"><span class="k" style="font-size:12px;color:var(--ink-soft)">Utilisé dans</span><br>';
+        childrenOf.forEach(function(c){
+          backHtml += '<span class="comp-tag">'+chSpanOf(c)+esc(sideTextOf(c))+'</span>';
+        });
+        backHtml += '</div>';
       }
       if(n.mnemonic){ backHtml += '<div class="mnemonic">'+esc(n.mnemonic)+'</div>'; }
       backHtml += '<div style="display:flex; gap:16px; justify-content:center; margin-top:14px;">';
@@ -11974,6 +11974,7 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
   }
 
   function openDeck(){
+    updateStreakDisplay();
     renderDeckMenu();
   }
 
