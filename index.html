@@ -10897,7 +10897,7 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     layout.run();
   }
 
-  function renderGraph(){
+  function renderGraph(cachedPositions){
     if(inFocusMode){
       inFocusMode = false;
       focusAnchorId = null;
@@ -10918,6 +10918,20 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
         }
       });
     });
+
+    // If we have a cached layout (e.g. just before entering an isolated focus view) and every
+    // node still on the map has a cached position, restore it instantly instead of re-running
+    // the full physics + overlap-resolution + packing pipeline again — much cheaper on big maps.
+    if(cachedPositions){
+      var allCached = nodes.every(function(n){ return !!cachedPositions[n.id]; });
+      if(allCached){
+        nodes.forEach(function(n){ cy.getElementById(n.id).position(cachedPositions[n.id]); });
+        cy.animate({ fit: { eles: cy.elements(), padding: 60 }, duration: 300 });
+        renderStats();
+        return;
+      }
+    }
+
     relayout();
     renderStats();
   }
@@ -11053,11 +11067,28 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     if(n.mnemonic){
       html += '<div class="mnemonic">'+esc(n.mnemonic)+'</div>';
     }
+    html += '<span class="review-link" id="detailGotoFocus" style="display:block; text-align:center; margin-top:14px;">Voir en vue isolée sur la carte →</span>';
     document.getElementById("detailBody").innerHTML = html;
 
     document.querySelectorAll("#detailBody [data-goto]").forEach(function(el){
       el.addEventListener("click", function(){ showDetail(el.getAttribute("data-goto")); });
     });
+
+    var gotoFocusBtn = document.getElementById("detailGotoFocus");
+    if(gotoFocusBtn){
+      gotoFocusBtn.addEventListener("click", function(){
+        var targetId = id;
+        switchView("map");
+        setTimeout(function(){
+          if(!cy.getElementById(targetId).empty()){
+            enterFocusMode(targetId);
+          } else {
+            renderGraph();
+            setTimeout(function(){ enterFocusMode(targetId); }, 50);
+          }
+        }, 200);
+      });
+    }
 
     document.querySelectorAll("#statusToggle button").forEach(function(b){
       b.classList.toggle("active", b.getAttribute("data-status")===n.status);
@@ -11173,9 +11204,15 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     return startNode.union(startNode.predecessors()).union(startNode.successors());
   }
 
+  var focusSavedPositions = null;
+
   function enterFocusMode(id){
     var subgraph = subgraphOf(id);
     if(!subgraph) return;
+    // snapshot the current full-map layout so exiting can restore it instantly, without
+    // re-running the whole physics + overlap-resolution + packing pipeline on a big map
+    focusSavedPositions = {};
+    cy.nodes().forEach(function(n){ focusSavedPositions[n.id()] = n.position(); });
     inFocusMode = true;
     focusAnchorId = id;
     document.getElementById("focusBanner").classList.add("show");
@@ -11193,7 +11230,8 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     inFocusMode = false;
     focusAnchorId = null;
     document.getElementById("focusBanner").classList.remove("show");
-    renderGraph();
+    renderGraph(focusSavedPositions);
+    focusSavedPositions = null;
   }
 
   cy.on("taphold", "node", function(evt){
