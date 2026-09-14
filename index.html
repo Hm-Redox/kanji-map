@@ -10976,6 +10976,21 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     backdrop.classList.add("show");
     sheet.classList.add("show");
   }
+  function focusWhenSheetOpen(sheetEl, inputEl){
+    var done = false;
+    function doFocus(){
+      if(done) return;
+      done = true;
+      sheetEl.removeEventListener("transitionend", onEnd);
+      inputEl.focus();
+    }
+    function onEnd(e){
+      if(e.target === sheetEl && e.propertyName === "transform") doFocus();
+    }
+    sheetEl.addEventListener("transitionend", onEnd);
+    // Fallback in case the transition event doesn't fire (e.g. reduced-motion settings)
+    setTimeout(doFocus, 400);
+  }
   function closeSheets(){
     backdrop.classList.remove("show");
     document.querySelectorAll(".sheet").forEach(function(s){ s.classList.remove("show"); });
@@ -10989,10 +11004,13 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
   // ---------- Detail sheet ----------
   var currentDetailId = null;
 
-  function showDetail(id){
+  function showDetail(id, fromPopstate){
     var n = state.nodes[id];
     if(!n) return;
     currentDetailId = id;
+    if(!fromPopstate){
+      history.pushState({ kanjiDetail: id }, "");
+    }
     document.getElementById("detailTitle").textContent = n.type==="k" ? "Kanji" : (n.isCustom ? "Composant personnel" : "Radical / composant");
 
     var childrenOf = allNodes().filter(function(o){ return (o.parents||[]).indexOf(id) !== -1; });
@@ -11052,13 +11070,23 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     openSheet(sheetDetail);
   }
 
+  window.addEventListener("popstate", function(e){
+    if(e.state && e.state.kanjiDetail && state.nodes[e.state.kanjiDetail]){
+      showDetail(e.state.kanjiDetail, true);
+    } else {
+      var d = document.getElementById("sheetDetail");
+      if(d) d.classList.remove("show");
+      backdrop.classList.remove("show");
+    }
+  });
+
   document.getElementById("btnToggleHideMap").addEventListener("click", function(){
     var n = state.nodes[currentDetailId];
     if(!n) return;
     n.hiddenFromMap = !n.hiddenFromMap;
     save();
     renderGraph();
-    showDetail(currentDetailId);
+    showDetail(currentDetailId, true);
   });
 
   document.querySelectorAll("#statusToggle button").forEach(function(b){
@@ -11068,7 +11096,7 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
       n.status = b.getAttribute("data-status");
       save();
       renderGraph();
-      showDetail(currentDetailId);
+      showDetail(currentDetailId, true);
     });
   });
 
@@ -11179,9 +11207,9 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     var id = evt.target.id();
 
     if(inFocusMode){
-      if(id === focusAnchorId) return; // tapping the current anchor again does nothing here
-      renderGraph(); // rebuild the full graph so the new anchor's complete lineage is available
-      enterFocusMode(id);
+      exitFocusMode();
+      currentHighlightId = id;
+      highlightLineage(id);
       return;
     }
 
@@ -11715,7 +11743,7 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     closeSheets();
     openSheet(sheetLibrary);
     libList.classList.add("show");
-    setTimeout(function(){ libSearch.focus(); }, 300);
+    focusWhenSheetOpen(sheetLibrary, libSearch);
   });
 
   // ---------- Map search (find something already on the map) ----------
@@ -11769,7 +11797,7 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     closeSheets();
     openSheet(sheetMapSearch);
     mapSearchList.classList.add("show");
-    setTimeout(function(){ mapSearchInput.focus(); }, 300);
+    focusWhenSheetOpen(sheetMapSearch, mapSearchInput);
   });
 
   // ---------- Review (Anki-like spaced repetition) ----------
@@ -11932,14 +11960,14 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
         backHtml += '<div style="margin-top:10px;"><span class="k" style="font-size:12px;color:var(--ink-soft)">Composé de</span><br>';
         n.parents.forEach(function(p){
           var pn = state.nodes[p];
-          if(pn) backHtml += '<span class="comp-tag">'+chSpanOf(pn)+esc(sideTextOf(pn))+'</span>';
+          if(pn) backHtml += '<span class="comp-tag" data-deckgoto="'+esc(p)+'">'+chSpanOf(pn)+esc(sideTextOf(pn))+'</span>';
         });
         backHtml += '</div>';
       }
       if(childrenOf.length){
         backHtml += '<div style="margin-top:10px;"><span class="k" style="font-size:12px;color:var(--ink-soft)">Utilisé dans</span><br>';
         childrenOf.forEach(function(c){
-          backHtml += '<span class="comp-tag">'+chSpanOf(c)+esc(sideTextOf(c))+'</span>';
+          backHtml += '<span class="comp-tag" data-deckgoto="'+esc(c.id)+'">'+chSpanOf(c)+esc(sideTextOf(c))+'</span>';
         });
         backHtml += '</div>';
       }
@@ -11961,6 +11989,12 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
       document.getElementById("reviewEdit").addEventListener("click", function(){
         deckEditingReturnId = n.id;
         openForm(n.id);
+      });
+      document.querySelectorAll("#reviewBack [data-deckgoto]").forEach(function(tag){
+        tag.style.cursor = "pointer";
+        tag.addEventListener("click", function(){
+          showDetail(tag.getAttribute("data-deckgoto"));
+        });
       });
     });
 
