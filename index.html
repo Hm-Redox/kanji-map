@@ -216,8 +216,8 @@
   .btn-row{ display:flex; gap:10px; margin-top:6px; }
   .jlpt-filter{ display:flex; flex-wrap:wrap; gap:6px; margin: 4px 0 14px; }
   .jlpt-filter button{
-    flex:1 1 auto; min-width:52px; padding:8px 4px; border:1px solid var(--border); background:var(--paper);
-    font-size:11.5px; color:var(--ink-soft); cursor:pointer; border-radius:3px;
+    flex:1 1 auto; min-width:68px; padding:8px 4px; border:1px solid var(--border); background:var(--paper);
+    font-size:10.5px; color:var(--ink-soft); cursor:pointer; border-radius:3px; white-space:nowrap;
   }
   .jlpt-filter button.active{ background:var(--indigo); color:#F1ECDD; border-color:var(--indigo); }
   .lib-row{
@@ -11739,7 +11739,24 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
   var libList = document.getElementById("libList");
   var currentJlptFilter = "all";
 
+  function updateJlptFilterLabels(){
+    document.querySelectorAll("#jlptFilter button").forEach(function(b){
+      var key = b.getAttribute("data-jlpt");
+      if(key === "all"){ b.textContent = "Tous"; return; }
+      if(key === "r"){
+        var totalR = SEED_RADICALS.length;
+        var haveR = SEED_RADICALS.filter(function(r){ return !!state.nodes[r.char]; }).length;
+        b.textContent = "Radicaux " + haveR + "/" + totalR;
+        return;
+      }
+      var totalK = SEED_KANJI.filter(function(k){ return k.jlpt === key; }).length;
+      var haveK = SEED_KANJI.filter(function(k){ return k.jlpt === key && !!state.nodes[k.char]; }).length;
+      b.textContent = key + " " + haveK + "/" + totalK;
+    });
+  }
+
   function renderLibrary(){
+    updateJlptFilterLabels();
     var q = libSearch.value.trim().toLowerCase();
 
     if(currentJlptFilter === "r"){
