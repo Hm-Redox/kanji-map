@@ -11204,6 +11204,34 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     return startNode.union(startNode.predecessors()).union(startNode.successors());
   }
 
+  // Full ancestor+descendant lineage of a kanji computed from the underlying data (not just
+  // what's currently rendered) — needed while in focus mode, since cy only holds a reduced subgraph.
+  function fullLineageIds(id){
+    var visited = {};
+    visited[id] = true;
+    var stack = [id];
+    while(stack.length){
+      var cur = stack.pop();
+      var n = state.nodes[cur];
+      if(!n) continue;
+      (n.parents||[]).forEach(function(p){
+        if(!visited[p]){ visited[p] = true; stack.push(p); }
+      });
+    }
+    var stack2 = [id];
+    var allN = allNodes();
+    while(stack2.length){
+      var cur2 = stack2.pop();
+      allN.forEach(function(n){
+        if((n.parents||[]).indexOf(cur2) !== -1 && !visited[n.id]){
+          visited[n.id] = true;
+          stack2.push(n.id);
+        }
+      });
+    }
+    return Object.keys(visited);
+  }
+
   var focusSavedPositions = null;
 
   function enterFocusMode(id){
@@ -11219,6 +11247,57 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     cy.batch(function(){
       cy.elements().not(subgraph).remove();
       cy.elements().removeClass("dimmed highlighted");
+    });
+    cy.layout({
+      name: "dagre", rankDir: "LR", nodeSep: 30, rankSep: 80,
+      animate: true, animationDuration: 350, fit: true, padding: 60
+    }).run();
+  }
+
+  // "Semi-isolated" expansion: while already inside an isolated view, tapping another kanji
+  // pulls in its own lineage (merging with what's already shown) instead of replacing the view,
+  // then highlights just the newly added pieces so they're easy to spot.
+  function expandFocusMode(id){
+    var lineageIds = fullLineageIds(id);
+    var existing = {};
+    cy.nodes().forEach(function(n){ existing[n.id()] = true; });
+    var newIds = lineageIds.filter(function(nid){ return !existing[nid]; });
+
+    cy.batch(function(){
+      newIds.forEach(function(nid){
+        var n = state.nodes[nid];
+        if(!n || n.hiddenFromMap) return;
+        cy.add({ group:"nodes", data:{ id:n.id, char:n.char, label:labelOf(n), isCustom:!!n.isCustom, hasImage:!!n.image, image:n.image||"", type:n.type, status:n.status, unreviewed: n.reviewed===false, bgColor: jlptColor(n.jlpt) } });
+      });
+      allNodes().forEach(function(n){
+        if(n.hiddenFromMap || cy.getElementById(n.id).empty()) return;
+        (n.parents||[]).forEach(function(p){
+          if(state.nodes[p] && !state.nodes[p].hiddenFromMap && !cy.getElementById(p).empty()){
+            var edgeId = p+"__"+n.id;
+            if(cy.getElementById(edgeId).empty()){
+              cy.add({ group:"edges", data:{ id:edgeId, source:p, target:n.id, variant: (n.variantParents||[]).indexOf(p)!==-1 } });
+            }
+          }
+        });
+      });
+    });
+
+    focusAnchorId = id;
+    cy.one("layoutstop", function(){
+      var lineageEles = cy.collection();
+      lineageIds.forEach(function(nid){ lineageEles = lineageEles.union(cy.getElementById(nid)); });
+      lineageEles = lineageEles.union(lineageEles.edgesWith(lineageEles));
+
+      var newEles = cy.collection();
+      newIds.forEach(function(nid){ newEles = newEles.union(cy.getElementById(nid)); });
+      newEles = newEles.union(newEles.connectedEdges());
+
+      cy.batch(function(){
+        cy.elements().removeClass("highlighted just-created").addClass("dimmed");
+        lineageEles.removeClass("dimmed").addClass("highlighted");
+        newEles.addClass("just-created");
+      });
+      setTimeout(function(){ cy.elements().removeClass("just-created"); }, 3500);
     });
     cy.layout({
       name: "dagre", rankDir: "LR", nodeSep: 30, rankSep: 80,
@@ -11245,9 +11324,8 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     var id = evt.target.id();
 
     if(inFocusMode){
-      exitFocusMode();
-      currentHighlightId = id;
-      highlightLineage(id);
+      if(id === focusAnchorId) return;
+      expandFocusMode(id);
       return;
     }
 
@@ -11811,13 +11889,14 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
         var id = el.getAttribute("data-goto-map");
         closeSheets();
         if(state.nodes[id] && state.nodes[id].hiddenFromMap){
-          setTimeout(function(){ showDetail(id); }, 200);
+          showDetail(id);
         } else {
-          setTimeout(function(){
-            renderGraph();
-            currentHighlightId = id;
-            enterFocusMode(id);
-          }, 200);
+          // Only rebuild the full graph if we're currently inside a different isolated view
+          // (cy might not contain this node yet) — otherwise it's already there, so skip
+          // the costly rebuild entirely and jump straight in, just like tapping on the map.
+          if(inFocusMode) renderGraph();
+          currentHighlightId = id;
+          enterFocusMode(id);
         }
       });
     });
