@@ -10990,21 +10990,6 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     backdrop.classList.add("show");
     sheet.classList.add("show");
   }
-  function focusWhenSheetOpen(sheetEl, inputEl){
-    var done = false;
-    function doFocus(){
-      if(done) return;
-      done = true;
-      sheetEl.removeEventListener("transitionend", onEnd);
-      inputEl.focus();
-    }
-    function onEnd(e){
-      if(e.target === sheetEl && e.propertyName === "transform") doFocus();
-    }
-    sheetEl.addEventListener("transitionend", onEnd);
-    // Fallback in case the transition event doesn't fire (e.g. reduced-motion settings)
-    setTimeout(doFocus, 400);
-  }
   function closeSheets(){
     backdrop.classList.remove("show");
     document.querySelectorAll(".sheet").forEach(function(s){ s.classList.remove("show"); });
@@ -11842,6 +11827,7 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
   libSearch.addEventListener("compositionend", function(){ libComposing = false; renderLibrary(); });
   libSearch.addEventListener("input", function(){ if(!libComposing) renderLibrary(); });
   libSearch.addEventListener("keyup", function(){ if(!libComposing) renderLibrary(); });
+  libSearch.addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); libSearch.blur(); } });
   document.querySelectorAll("#jlptFilter button").forEach(function(b){
     b.addEventListener("click", function(){
       document.querySelectorAll("#jlptFilter button").forEach(function(x){ x.classList.remove("active"); });
@@ -11859,7 +11845,6 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     closeSheets();
     openSheet(sheetLibrary);
     libList.classList.add("show");
-    focusWhenSheetOpen(sheetLibrary, libSearch);
   });
 
   // ---------- Map search (find something already on the map) ----------
@@ -11907,6 +11892,7 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
   mapSearchInput.addEventListener("compositionend", function(){ mapSearchComposing = false; renderMapSearch(); });
   mapSearchInput.addEventListener("input", function(){ if(!mapSearchComposing) renderMapSearch(); });
   mapSearchInput.addEventListener("keyup", function(){ if(!mapSearchComposing) renderMapSearch(); });
+  mapSearchInput.addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); mapSearchInput.blur(); } });
 
   document.getElementById("btnMapSearch").addEventListener("click", function(){
     mapSearchInput.value = "";
@@ -11914,7 +11900,6 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     closeSheets();
     openSheet(sheetMapSearch);
     mapSearchList.classList.add("show");
-    focusWhenSheetOpen(sheetMapSearch, mapSearchInput);
   });
 
   // ---------- Review (Anki-like spaced repetition) ----------
