@@ -92,6 +92,18 @@
     box-shadow: var(--shadow);
   }
   #focusBanner.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+  #quickFilterBar{
+    position:absolute; top:60px; left:0; right:0; z-index:18;
+    display:flex; gap:6px; padding:0 12px; overflow-x:auto;
+    -ms-overflow-style:none; scrollbar-width:none;
+  }
+  #quickFilterBar::-webkit-scrollbar{ display:none; }
+  #quickFilterBar button{
+    flex:none; padding:6px 12px; border:1px solid var(--border); background:rgba(241,236,221,0.9);
+    color:var(--ink-soft); font-size:11.5px; border-radius:14px; cursor:pointer; white-space:nowrap;
+  }
+  #quickFilterBar button.active{ background:var(--indigo); color:#F1ECDD; border-color:var(--indigo); font-weight:600; }
   #empty .glyph{ font-size:64px; color:var(--ink); opacity:0.85; }
   #empty h2{ margin:0; font-size:17px; font-weight:600; }
   #empty p{ margin:0; font-size:13px; color:var(--ink-soft); max-width:280px; line-height:1.5; }
@@ -368,6 +380,15 @@
   </div>
 
   <div id="focusBanner">Vue isolée · tape un kanji pour repartir de lui, ou dans le vide pour revenir</div>
+
+  <div id="quickFilterBar">
+    <button type="button" class="active" data-qfilter="all">Tous</button>
+    <button type="button" data-qfilter="N5">N5</button>
+    <button type="button" data-qfilter="N4">N4</button>
+    <button type="button" data-qfilter="N3">N3</button>
+    <button type="button" data-qfilter="N2-N1">N2-N1</button>
+    <button type="button" data-qfilter="r">Radicaux</button>
+  </div>
 
   <div id="mapSearchList" class="results-overlay"></div>
   <div id="libList" class="results-overlay"></div>
@@ -10897,6 +10918,14 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     layout.run();
   }
 
+  var quickCategoryFilter = null; // null = show everything; else "N5"/"N4"/"N3"/"N2-N1"/"r"
+
+  function matchesQuickFilter(n){
+    if(!quickCategoryFilter) return true;
+    if(quickCategoryFilter === "r") return n.type === "r";
+    return n.type === "k" && n.jlpt === quickCategoryFilter;
+  }
+
   function renderGraph(cachedPositions){
     if(inFocusMode){
       inFocusMode = false;
@@ -10906,14 +10935,14 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     }
     cy.elements().remove();
     var allTheNodes = allNodes();
-    var nodes = allTheNodes.filter(function(n){ return !n.hiddenFromMap; });
+    var nodes = allTheNodes.filter(function(n){ return !n.hiddenFromMap && matchesQuickFilter(n); });
     document.getElementById("empty").classList.toggle("show", allTheNodes.length===0);
     nodes.forEach(function(n){
       cy.add({ group:"nodes", data:{ id:n.id, char:n.char, label:labelOf(n), isCustom:!!n.isCustom, hasImage:!!n.image, image:n.image||"", type:n.type, status:n.status, unreviewed: n.reviewed===false, bgColor: jlptColor(n.jlpt) } });
     });
     nodes.forEach(function(n){
       (n.parents||[]).forEach(function(p){
-        if(state.nodes[p] && !state.nodes[p].hiddenFromMap){
+        if(state.nodes[p] && !state.nodes[p].hiddenFromMap && matchesQuickFilter(state.nodes[p])){
           cy.add({ group:"edges", data:{ id:p+"__"+n.id, source:p, target:n.id, variant: (n.variantParents||[]).indexOf(p)!==-1 } });
         }
       });
@@ -10926,6 +10955,9 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
       var allCached = nodes.every(function(n){ return !!cachedPositions[n.id]; });
       if(allCached){
         nodes.forEach(function(n){ cy.getElementById(n.id).position(cachedPositions[n.id]); });
+        // Cheap safety pass: fixes any residual overlap without paying for the full
+        // physics + packing recompute (which is what made exiting focus mode slow before).
+        resolveOverlaps(16);
         cy.animate({ fit: { eles: cy.elements(), padding: 60 }, duration: 300 });
         renderStats();
         return;
@@ -11314,23 +11346,14 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
       return;
     }
 
-    if(currentHighlightId === id){
-      enterFocusMode(id);
-      return;
-    }
-
-    currentHighlightId = id;
-    highlightLineage(id);
+    enterFocusMode(id);
   });
 
   cy.on("tap", function(evt){
     if(evt.target !== cy) return;
     cy.elements().removeClass("just-created");
     if(inFocusMode){
-      var anchor = focusAnchorId;
       exitFocusMode();
-      currentHighlightId = anchor;
-      highlightLineage(anchor);
       return;
     }
     clearHighlight();
@@ -11763,7 +11786,7 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
       var radItems = SEED_RADICALS.filter(function(r){
         if(!q) return true;
         return r.char.indexOf(q)!==-1 || r.meaning.toLowerCase().indexOf(q)!==-1;
-      }).slice(0, 150);
+      }).slice(0, 500);
 
       var radHtml = "";
       radItems.forEach(function(r){
@@ -11784,7 +11807,7 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
       if(currentJlptFilter !== "all" && k.jlpt !== currentJlptFilter) return false;
       if(!q) return true;
       return k.char.indexOf(q)!==-1 || k.meaning.toLowerCase().indexOf(q)!==-1;
-    }).slice(0, 150);
+    }).slice(0, 500);
 
     var html = "";
     items.forEach(function(k){
@@ -12275,6 +12298,21 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     b.addEventListener("click", function(){
       switchView(b.getAttribute("data-view"));
       closeDrawer();
+    });
+  });
+
+  document.querySelectorAll("#quickFilterBar button").forEach(function(b){
+    b.addEventListener("click", function(){
+      var key = b.getAttribute("data-qfilter");
+      if(key === "all" || quickCategoryFilter === key){
+        quickCategoryFilter = null;
+      } else {
+        quickCategoryFilter = key;
+      }
+      document.querySelectorAll("#quickFilterBar button").forEach(function(x){
+        x.classList.toggle("active", quickCategoryFilter === null ? x.getAttribute("data-qfilter")==="all" : x.getAttribute("data-qfilter")===quickCategoryFilter);
+      });
+      renderGraph();
     });
   });
 
