@@ -723,17 +723,6 @@
         <button type="button" data-val="N3">N3</button>
         <button type="button" data-val="N2-N1">N2-N1</button>
       </div>
-      <div class="jlpt-filter" id="vocabLibType" style="margin-bottom:6px;">
-        <button type="button" class="active" data-val="">Tous types</button>
-        <button type="button" data-val="nom">Nom</button>
-        <button type="button" data-val="verbe">Verbe</button>
-        <button type="button" data-val="adj-i">Adj. -i</button>
-        <button type="button" data-val="adj-na">Adj. -na</button>
-        <button type="button" data-val="adverbe">Adverbe</button>
-        <button type="button" data-val="particule">Particule</button>
-        <button type="button" data-val="expression">Expression</button>
-        <button type="button" data-val="autre">Autre</button>
-      </div>
       <input type="text" id="vocabLibKanji" maxlength="2" placeholder="Kanji imposé (ex : 食)" style="width:120px; border:1px solid var(--border); background:var(--paper); padding:7px 9px; font-size:14px; border-radius:3px; font-family:var(--kanji-display); text-align:center; margin-bottom:8px;">
       <div id="vocabLibList" style="max-height:60vh; overflow-y:auto;"></div>
     </div>
@@ -12922,16 +12911,21 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
   }
 
   var vocabLibJlptFilter = "N5";
-  var vocabLibTypeFilter = "";
   function vocabAlreadyAdded(word, reading){
     return allVocab().some(function(w){ return w.word === word && w.reading === reading; });
   }
+  function vocabSeedJlptMatches(entryJlpt, filterVal){
+    // The seed dataset keeps N2 and N1 as separate tags, but the app groups them into
+    // one "N2-N1" tier everywhere else — bridge that here rather than showing it empty.
+    if(filterVal === "N2-N1") return entryJlpt === "N2" || entryJlpt === "N1";
+    return entryJlpt === filterVal;
+  }
+
   function renderVocabLibrary(){
     var q = document.getElementById("vocabLibSearch").value.trim().toLowerCase();
     var kanjiFilter = document.getElementById("vocabLibKanji").value.trim();
     var items = SEED_VOCAB.filter(function(v){
-      if(v.jlpt !== vocabLibJlptFilter) return false;
-      if(vocabLibTypeFilter && v.type !== vocabLibTypeFilter) return false;
+      if(!vocabSeedJlptMatches(v.jlpt, vocabLibJlptFilter)) return false;
       if(kanjiFilter && kanjiCharsIn(v.word).indexOf(kanjiFilter) === -1) return false;
       if(!q) return true;
       return v.word.indexOf(q)!==-1 || v.reading.indexOf(q)!==-1 || v.meaning.toLowerCase().indexOf(q)!==-1;
@@ -12942,7 +12936,7 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
       html += '<div class="lib-row" data-vlibidx="'+idx+'" style="opacity:'+(added?'.45':'1')+';">';
       html += '  <span class="kanji-font" style="font-size:20px; white-space:nowrap; flex:none; margin-right:10px;">'+esc(v.word)+'</span>';
       html += '  <span style="flex:1; min-width:0; font-size:13px;">'+esc(v.meaning)+(v.en?' <span class="en-badge" style="font-size:9px; border:1px solid var(--border); border-radius:3px; padding:1px 3px; margin-left:4px;">EN</span>':'')+'</span>';
-      html += '  <span style="font-size:10px; color:var(--ink-soft);">'+(added?'✓ ajouté':v.type||"")+'</span>';
+      html += '  <span style="font-size:10px; color:var(--ink-soft);">'+(added?'✓ ajouté':"")+'</span>';
       html += '</div>';
     });
     document.getElementById("vocabLibList").innerHTML = html || '<div class="vocab-empty">Aucun résultat.</div>';
@@ -12954,8 +12948,7 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
         document.getElementById("vfWord").value = v.word;
         document.getElementById("vfReading").value = v.reading;
         document.getElementById("vfMeaning").value = v.meaning;
-        document.getElementById("vfType").value = v.type || "";
-        document.getElementById("vfJlpt").value = v.jlpt || "";
+        document.getElementById("vfJlpt").value = v.jlpt === "N1" || v.jlpt === "N2" ? "N2-N1" : (v.jlpt || "");
       });
     });
   }
@@ -12966,14 +12959,6 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
   });
   document.getElementById("vocabLibSearch").addEventListener("input", renderVocabLibrary);
   document.getElementById("vocabLibKanji").addEventListener("input", renderVocabLibrary);
-  document.querySelectorAll("#vocabLibType button").forEach(function(b){
-    b.addEventListener("click", function(){
-      document.querySelectorAll("#vocabLibType button").forEach(function(x){ x.classList.remove("active"); });
-      b.classList.add("active");
-      vocabLibTypeFilter = b.getAttribute("data-val");
-      renderVocabLibrary();
-    });
-  });
   document.querySelectorAll("#vocabLibJlpt button").forEach(function(b){
     b.addEventListener("click", function(){
       document.querySelectorAll("#vocabLibJlpt button").forEach(function(x){ x.classList.remove("active"); });
