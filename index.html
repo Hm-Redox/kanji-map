@@ -396,6 +396,10 @@
     display:inline-flex; align-items:center; gap:5px; background:var(--paper); border:1px solid var(--border);
     border-radius:3px; padding:4px 8px; margin:3px 3px 0 0; font-size:12.5px; cursor:pointer;
   }
+  .vocab-example-row{
+    display:flex; align-items:baseline; gap:8px; padding:6px 2px; border-bottom:1px solid var(--paper-line); cursor:pointer;
+  }
+  .vocab-example-row:last-child{ border-bottom:none; }
   .comp-tag .ch{ font-family:var(--kanji-display); }
   .ch.custom, .parent-chip .ch.custom, .parent-suggest .opt .ch.custom{
     font-family: inherit; font-style: italic; font-size: 12px; color: var(--indigo);
@@ -11325,6 +11329,21 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
       });
       html += '</div>';
     }
+    if(n.char && typeof allVocab === "function"){
+      var vocabExamples = allVocab().filter(function(w){ return kanjiCharsIn(w.word).indexOf(n.char) !== -1; });
+      if(vocabExamples.length){
+        vocabExamples.sort(function(a,b){ return (a.word||"").localeCompare(b.word||"", "ja"); });
+        html += '<div style="margin-top:10px;"><span class="k" style="font-size:12px;color:var(--ink-soft)">Exemples (vocabulaire)</span>';
+        vocabExamples.forEach(function(w){
+          html += '<div class="vocab-example-row" data-vocabexample="'+esc(w.id)+'">'
+                + '<span class="kanji-font" style="font-size:16px;">'+esc(w.word)+'</span>'
+                + '<span style="font-size:11px; color:var(--ink-soft);">'+esc(w.reading||"")+'</span>'
+                + '<span style="font-size:12px; flex:1; text-align:right;">'+esc(w.meaning||"")+'</span>'
+                + '</div>';
+        });
+        html += '</div>';
+      }
+    }
     if(n.mnemonic){
       html += '<div class="mnemonic">'+esc(n.mnemonic)+'</div>';
     }
@@ -11333,6 +11352,12 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
 
     document.querySelectorAll("#detailBody [data-goto]").forEach(function(el){
       el.addEventListener("click", function(){ showDetail(el.getAttribute("data-goto")); });
+    });
+    document.querySelectorAll("#detailBody [data-vocabexample]").forEach(function(el){
+      el.addEventListener("click", function(){
+        closeSheets();
+        setTimeout(function(){ showVocabDetail(el.getAttribute("data-vocabexample")); }, 200);
+      });
     });
 
     var gotoFocusBtn = document.getElementById("detailGotoFocus");
