@@ -491,7 +491,8 @@
       <button id="btnVocabDeckBack">←</button>
       <button class="btnOpenDrawer" aria-label="Menu">☰</button>
       <h2>Deck vocab</h2>
-      <span id="vocabDeckStreak" style="margin-left:auto; font-size:14px; font-weight:600; color:var(--seal); display:flex; align-items:center; gap:4px;"></span>
+      <button id="btnVocabDeckFilter" style="margin-left:auto; font-size:13px; border:1px solid var(--border); border-radius:14px; padding:5px 12px; background:var(--paper-card);">Filtres</button>
+      <span id="vocabDeckStreak" style="font-size:14px; font-weight:600; color:var(--seal); display:flex; align-items:center; gap:4px;"></span>
     </div>
     <div id="vocabDeckBody"></div>
   </div>
@@ -12952,7 +12953,7 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
   });
   function refreshActiveVocabView(){
     if(document.getElementById("viewVocabDeck").classList.contains("show")){
-      renderVocabDeckMenu();
+      startVocabReview();
     } else {
       renderVocabList();
     }
@@ -13054,23 +13055,15 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
   // ---------- Vocab deck (separate SRS deck for vocabulary) ----------
   var vocabReviewQueue = [];
   var vocabReviewIndex = 0;
-  var vocabDeckScreen = "menu";
-  var VOCAB_CATEGORIES = [
-    { key: "N5", label: "N5" },
-    { key: "N4", label: "N4" },
-    { key: "N3", label: "N3" },
-    { key: "N2-N1", label: "N2-N1" },
-    { key: "", label: "Sans niveau" }
-  ];
 
   function ensureVocabSrs(w){
     if(!w.srs){ w.srs = { interval: 0, ease: 2.5, due: Date.now(), reps: 0 }; }
     return w.srs;
   }
-  function dueVocabForCategory(catKey){
+  function dueVocabFiltered(){
     var now = Date.now();
     return allVocab().filter(function(w){
-      if(w.jlpt !== catKey) return false;
+      if(vocabFilters.jlpt && w.jlpt !== vocabFilters.jlpt) return false;
       if(vocabFilters.type && w.type !== vocabFilters.type) return false;
       if(vocabFilters.status && (w.status||"unknown") !== vocabFilters.status) return false;
       if(vocabFilters.kanji && kanjiCharsIn(w.word).indexOf(vocabFilters.kanji) === -1) return false;
@@ -13106,41 +13099,28 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     saveVocab();
   }
 
-  function renderVocabDeckMenu(){
-    vocabDeckScreen = "menu";
-    var hasActiveFilters = !!(vocabFilters.type || vocabFilters.status || vocabFilters.kanji || vocabFilters.themes.length);
-    var html = '<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">'
-              + '<span style="font-size:13px; color:var(--ink-soft);">Choisis quoi réviser :</span>'
-              + '<button id="btnVocabDeckFilter" class="toggle-all-btn'+(hasActiveFilters?' active':'')+'" type="button">Filtres'+(hasActiveFilters?' •':'')+'</button>'
-              + '</div>';
-    VOCAB_CATEGORIES.forEach(function(c){
-      var count = dueVocabForCategory(c.key).length;
-      html += '<button class="deck-cat-btn" data-vcat="'+esc(c.key)+'"'+(count===0?' disabled':'')+'>'
-            + '<span>'+c.label+'</span><span class="deck-cat-count">'+count+'</span></button>';
-    });
-    document.getElementById("vocabDeckBody").innerHTML = html;
-    document.querySelectorAll(".deck-cat-btn[data-vcat]:not([disabled])").forEach(function(b){
-      b.addEventListener("click", function(){ startVocabReview(b.getAttribute("data-vcat")); });
-    });
-    document.getElementById("btnVocabDeckFilter").addEventListener("click", openVocabFilterSheet);
-  }
-  function startVocabReview(catKey){
-    vocabReviewQueue = dueVocabForCategory(catKey);
+  function startVocabReview(){
+    vocabReviewQueue = dueVocabFiltered();
     vocabReviewIndex = 0;
-    vocabDeckScreen = "review";
     renderVocabReviewCard();
   }
   function renderVocabReviewCard(){
     var body = document.getElementById("vocabDeckBody");
     if(vocabReviewIndex >= vocabReviewQueue.length){
-      body.innerHTML = '<div class="review-empty">Terminé pour cette catégorie ✓<br>Reviens plus tard, ou choisis autre chose.</div>'
-        + '<button class="review-flip" id="btnVocabBackToMenu" style="margin-top:16px;">← Choisir une autre catégorie</button>';
-      document.getElementById("btnVocabBackToMenu").addEventListener("click", renderVocabDeckMenu);
+      var hasActiveFilters = !!(vocabFilters.jlpt || vocabFilters.type || vocabFilters.status || vocabFilters.kanji || vocabFilters.themes.length);
+      body.innerHTML = '<div class="review-empty">'+(vocabReviewQueue.length ? "Terminé pour l'instant ✓" : "Rien à réviser pour l'instant.")+'<br>'
+        + (hasActiveFilters ? "Essaie d'élargir tes filtres, ou reviens plus tard." : "Reviens plus tard, ou ajoute des mots à réviser.")+'</div>'
+        + '<button class="review-flip" id="btnVocabOpenFilters" style="margin-top:16px;">Filtres'+(hasActiveFilters?' •':'')+'</button>';
+      document.getElementById("btnVocabOpenFilters").addEventListener("click", openVocabFilterSheet);
       return;
     }
     var w = vocabReviewQueue[vocabReviewIndex];
+    var hasKanji = kanjiCharsIn(w.word).length > 0;
     var html = '<div class="review-progress">'+(vocabReviewIndex+1)+' / '+vocabReviewQueue.length+'</div>';
-    html += '<div class="review-kanji">'+esc(w.word)+'</div>';
+    html += '<div class="review-kanji" id="vocabReviewWord" style="cursor:pointer;">'+esc(w.word)+'</div>';
+    if(hasKanji){
+      html += '<div id="vocabReviewFurigana" style="text-align:center; font-size:14px; color:var(--ink-soft); margin-top:-10px; margin-bottom:14px; display:none;">'+esc(w.reading||"")+'</div>';
+    }
     html += '<div id="vocabReviewBack" style="display:none;"></div>';
     html += '<button class="review-flip" id="btnVocabFlip">Retourner la carte</button>';
     html += '<div class="review-ratings" id="vocabReviewRatings" style="display:none;">'
@@ -13150,6 +13130,13 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
           + '<button data-vrating="learned" style="background:var(--seal);">Appris</button>'
           + '</div>';
     body.innerHTML = html;
+
+    if(hasKanji){
+      document.getElementById("vocabReviewWord").addEventListener("click", function(){
+        var fg = document.getElementById("vocabReviewFurigana");
+        fg.style.display = fg.style.display === "none" ? "block" : "none";
+      });
+    }
 
     document.getElementById("btnVocabFlip").addEventListener("click", function(){
       var chars = kanjiCharsIn(w.word);
@@ -13188,10 +13175,8 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
       });
     });
   }
-  document.getElementById("btnVocabDeckBack").addEventListener("click", function(){
-    if(vocabDeckScreen === "review"){ renderVocabDeckMenu(); }
-    else { switchView("map"); }
-  });
+  document.getElementById("btnVocabDeckBack").addEventListener("click", function(){ switchView("map"); });
+  document.getElementById("btnVocabDeckFilter").addEventListener("click", openVocabFilterSheet);
 
   function switchView(view){
     closeSheets();
@@ -13216,7 +13201,7 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
       updateStreakDisplay();
       var s = document.getElementById("vocabDeckStreak");
       if(s) s.textContent = document.getElementById("deckStreak").textContent;
-      renderVocabDeckMenu();
+      startVocabReview();
     }
   }
 
