@@ -450,6 +450,7 @@
       <button class="drawer-item" data-view="deck">🎴 <span>Deck kanji</span></button>
       <button class="drawer-item" data-view="vocablist">📖 <span>Liste vocab</span></button>
       <button class="drawer-item" data-view="vocabdeck">🔤 <span>Deck vocab</span></button>
+      <button class="drawer-item" id="btnOpenBackup">💾 <span>Sauvegarde</span></button>
     </nav>
   </div>
 
@@ -739,6 +740,30 @@
       </div>
       <input type="text" id="vocabLibKanji" maxlength="2" placeholder="Kanji imposé (ex : 食)" style="width:120px; border:1px solid var(--border); background:var(--paper); padding:7px 9px; font-size:14px; border-radius:3px; font-family:var(--kanji-display); text-align:center; margin-bottom:8px;">
       <div id="vocabLibList" style="max-height:60vh; overflow-y:auto;"></div>
+    </div>
+  </div>
+
+  <!-- Backup / restore sheet -->
+  <div class="sheet" id="sheetBackup">
+    <div class="sheet-handle"></div>
+    <div class="sheet-scroll">
+      <div class="sheet-header">
+        <h3>Sauvegarde</h3>
+        <button class="sheet-close" data-close>✕</button>
+      </div>
+      <p style="font-size:13px; color:var(--ink-soft); line-height:1.5;">
+        Tes données (kanjis, vocabulaire, série) sont stockées uniquement sur cet appareil,
+        dans ce navigateur. Elles ne se synchronisent pas ailleurs. Exporte un fichier de
+        sauvegarde régulièrement, ou avant de changer de téléphone.
+      </p>
+      <button class="btn btn-primary" id="btnExportData" style="width:100%; margin-top:8px;">⬇️ Exporter mes données</button>
+      <div style="margin-top:18px; padding-top:18px; border-top:1px solid var(--border);">
+        <p style="font-size:13px; color:var(--ink-soft); line-height:1.5; margin-top:0;">
+          Restaurer une sauvegarde <b>remplace toutes tes données actuelles</b> sur cet appareil.
+        </p>
+        <button class="btn btn-ghost" id="btnImportData" style="width:100%;">⬆️ Importer une sauvegarde</button>
+        <input type="file" id="importFileInput" accept="application/json" style="display:none;">
+      </div>
     </div>
   </div>
 
@@ -11422,10 +11447,12 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     });
   });
 
-  function askConfirm(message, onConfirm){
+  function askConfirm(message, onConfirm, okLabel){
     var backdrop2 = document.getElementById("confirmBackdrop");
     var dialog = document.getElementById("confirmDialog");
     document.getElementById("confirmMessage").textContent = message;
+    var okBtn = document.getElementById("confirmOk");
+    okBtn.textContent = okLabel || "Supprimer";
     backdrop2.classList.add("show");
     dialog.style.opacity = "1";
     dialog.style.pointerEvents = "auto";
@@ -11440,7 +11467,6 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
       cancelBtn.removeEventListener("click", onCancel);
       backdrop2.removeEventListener("click", onCancel);
     }
-    var okBtn = document.getElementById("confirmOk");
     var cancelBtn = document.getElementById("confirmCancel");
     function onOk(){ cleanup(); onConfirm(); }
     function onCancel(){ cleanup(); }
@@ -12486,6 +12512,55 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     drawerBackdrop.classList.remove("show");
   }
   document.getElementById("btnDrawer").addEventListener("click", openDrawer);
+
+  // ---------- Backup / restore ----------
+  var BACKUP_KEYS = ["kanjimap_manual_v1", "kanjimap_vocab_v1", "kanjimap_streak", "kanjimap_hidden_snapshot"];
+  document.getElementById("btnOpenBackup").addEventListener("click", function(){
+    closeDrawer();
+    closeSheets();
+    openSheet(document.getElementById("sheetBackup"));
+  });
+  document.getElementById("btnExportData").addEventListener("click", function(){
+    var data = { app: "kumitate", version: 1, exportedAt: new Date().toISOString() };
+    BACKUP_KEYS.forEach(function(k){ data[k] = localStorage.getItem(k); });
+    var blob = new Blob([JSON.stringify(data)], { type: "application/json" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    var dateStr = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = "kumitate-sauvegarde-" + dateStr + ".json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+  document.getElementById("btnImportData").addEventListener("click", function(){
+    document.getElementById("importFileInput").click();
+  });
+  document.getElementById("importFileInput").addEventListener("change", function(e){
+    var file = e.target.files[0];
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(evt){
+      var data;
+      try{ data = JSON.parse(evt.target.result); }
+      catch(err){ alert("Fichier invalide : impossible de le lire."); e.target.value = ""; return; }
+      if(!data || data.app !== "kumitate"){
+        alert("Ce fichier ne semble pas être une sauvegarde de 組み立て.");
+        e.target.value = "";
+        return;
+      }
+      askConfirm("Restaurer cette sauvegarde va remplacer toutes tes données actuelles sur cet appareil. Continuer ?", function(){
+        BACKUP_KEYS.forEach(function(k){
+          if(data[k] === undefined || data[k] === null) return;
+          localStorage.setItem(k, data[k]);
+        });
+        location.reload();
+      }, "Restaurer");
+      e.target.value = "";
+    };
+    reader.readAsText(file);
+  });
   document.querySelectorAll(".btnOpenDrawer").forEach(function(b){ b.addEventListener("click", openDrawer); });
   drawerBackdrop.addEventListener("click", closeDrawer);
 
@@ -13221,7 +13296,7 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     }
   }
 
-  document.querySelectorAll(".drawer-item").forEach(function(b){
+  document.querySelectorAll(".drawer-item[data-view]").forEach(function(b){
     b.addEventListener("click", function(){
       switchView(b.getAttribute("data-view"));
       closeDrawer();
