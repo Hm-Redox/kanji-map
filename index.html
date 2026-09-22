@@ -12694,6 +12694,7 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
   }
 
   var vocabEditingId = null;
+  var vocabDeckEditingReturnId = null;
   var vocabFilters = { jlpt:"", type:"", kanji:"", themes:[], status:"" };
   var vocabRevealed = {}; // id -> true, transient (resets on full re-render call from filters/search changes)
   var vocabShowAllFurigana = false;
@@ -12899,6 +12900,19 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     };
     saveVocab();
     closeSheets();
+
+    // If this word was being edited from within a Deck vocab review session, go back to
+    // that card (refreshed) instead of the list, so the review isn't interrupted.
+    if(vocabDeckEditingReturnId === id){
+      vocabDeckEditingReturnId = null;
+      if(vocabReviewQueue[vocabReviewIndex] && vocabReviewQueue[vocabReviewIndex].id === id){
+        vocabReviewQueue[vocabReviewIndex] = vocabState.words[id];
+      }
+      document.getElementById("viewVocabDeck").classList.add("show");
+      renderVocabReviewCard();
+      return;
+    }
+
     renderVocabList();
   });
 
@@ -13244,11 +13258,18 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
         backHtml += '</div>';
       }
       if(w.mnemonic){ backHtml += '<div class="mnemonic">'+esc(w.mnemonic)+'</div>'; }
+      backHtml += '<div style="display:flex; gap:16px; justify-content:center; margin-top:14px;">';
+      backHtml += '<span class="review-link" id="vocabReviewEdit">Modifier la fiche ✎</span>';
+      backHtml += '</div>';
       backHtml += '</div>';
       document.getElementById("vocabReviewBack").innerHTML = backHtml;
       document.getElementById("vocabReviewBack").style.display = "";
       document.getElementById("btnVocabFlip").style.display = "none";
       document.getElementById("vocabReviewRatings").style.display = "";
+      document.getElementById("vocabReviewEdit").addEventListener("click", function(){
+        vocabDeckEditingReturnId = w.id;
+        openVocabForm(w.id);
+      });
       document.querySelectorAll("#vocabReviewBack [data-vdeckgoto]").forEach(function(tag){
         tag.style.cursor = "pointer";
         tag.addEventListener("click", function(){ showDetail(tag.getAttribute("data-vdeckgoto")); });
