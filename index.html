@@ -647,12 +647,12 @@
       <div class="field" style="margin-top:16px;">
         <label>Statut</label>
         <div class="status-toggle" id="vocabStatusToggle">
-          <button data-status="difficult"><span class="dot" style="background:#7A4A42"></span>Difficile</button>
-          <button data-status="unknown"><span class="dot" style="background:#9a9384"></span>Inconnu</button>
-          <button data-status="meaning_known"><span class="dot" style="background:#5C7FA6"></span>Sens connu</button>
-          <button data-status="assisted"><span class="dot" style="background:#B58A5C"></span>Assisté</button>
-          <button data-status="in_progress"><span class="dot" style="background:var(--indigo)"></span>En cours</button>
-          <button data-status="learned"><span class="dot" style="background:var(--seal)"></span>Appris</button>
+          <button data-status="unknown"><span class="dot" style="background:#9a9384"></span>À revoir</button>
+          <button data-status="difficult"><span class="dot" style="background:#7A4A42"></span>Sens connue</button>
+          <button data-status="meaning_known"><span class="dot" style="background:#5C7FA6"></span>Assisté</button>
+          <button data-status="assisted"><span class="dot" style="background:#B58A5C"></span>Difficile</button>
+          <button data-status="in_progress"><span class="dot" style="background:var(--indigo)"></span>Correct</button>
+          <button data-status="learned"><span class="dot" style="background:var(--seal)"></span>Facile</button>
         </div>
       </div>
       <div class="btn-row">
@@ -698,12 +698,12 @@
         <label>Statut</label>
         <div class="jlpt-filter" id="vocabFilterStatus">
           <button type="button" class="active" data-val="">Tous</button>
-          <button type="button" data-val="difficult">Difficile</button>
-          <button type="button" data-val="unknown">Inconnu</button>
-          <button type="button" data-val="meaning_known">Sens connu</button>
-          <button type="button" data-val="assisted">Assisté</button>
-          <button type="button" data-val="in_progress">En cours</button>
-          <button type="button" data-val="learned">Appris</button>
+          <button type="button" data-val="unknown">À revoir</button>
+          <button type="button" data-val="difficult">Sens connue</button>
+          <button type="button" data-val="meaning_known">Assisté</button>
+          <button type="button" data-val="assisted">Difficile</button>
+          <button type="button" data-val="in_progress">Correct</button>
+          <button type="button" data-val="learned">Facile</button>
         </div>
       </div>
       <div class="field">
@@ -12341,29 +12341,32 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     el.textContent = count > 0 ? ("🔥 " + count) : "";
   }
 
-  function applySrsRating(n, rating){
-    var srs = ensureSrs(n);
-    if(n.status === "unknown") n.status = "in_progress";
-
-    if(rating === "again"){
+  // Real SM-2 (SuperMemo 2) core: q is a 0-5 quality grade.
+  // q < 3 is a failure (reset to a 1-day interval); q >= 3 grows the interval using the
+  // classic 1 → 6 → interval*ease progression. The ease update uses SM-2's exact formula,
+  // floored at 1.3, so cards you find hard settle into shorter intervals over time and easy
+  // ones stretch out — driven by your own review history, not a fixed per-status multiplier.
+  function sm2Update(srs, q){
+    if(q < 3){
       srs.reps = 0;
       srs.interval = 1;
-      srs.ease = Math.max(1.3, srs.ease - 0.2);
-    } else if(rating === "hard"){
-      srs.interval = Math.max(1, Math.round((srs.interval || 1) * 1.2));
-      srs.ease = Math.max(1.3, srs.ease - 0.15);
-      srs.reps += 1;
-    } else if(rating === "good"){
+    } else {
       if(srs.reps === 0) srs.interval = 1;
       else if(srs.reps === 1) srs.interval = 6;
       else srs.interval = Math.round(srs.interval * srs.ease);
       srs.reps += 1;
-    } else if(rating === "easy"){
-      srs.interval = Math.round((srs.interval || 1) * srs.ease * 1.3) || 4;
-      srs.ease = srs.ease + 0.15;
-      srs.reps += 1;
     }
+    srs.ease = srs.ease + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02));
+    if(srs.ease < 1.3) srs.ease = 1.3;
     srs.due = Date.now() + srs.interval * 24 * 60 * 60 * 1000;
+  }
+
+  function applySrsRating(n, rating){
+    var srs = ensureSrs(n);
+    if(n.status === "unknown") n.status = "in_progress";
+    // Anki's usual 4-button → SM-2 quality mapping: Again=0, Hard=3, Good=4, Easy=5.
+    var q = rating === "again" ? 0 : rating === "hard" ? 3 : rating === "good" ? 4 : 5;
+    sm2Update(srs, q);
     if(srs.interval >= SRS_MATURE_DAYS){ n.status = "learned"; }
     recordReviewActivity();
     updateStreakDisplay();
@@ -12732,12 +12735,12 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     var counts = { difficult:0, unknown:0, meaning_known:0, assisted:0, in_progress:0, learned:0 };
     items.forEach(function(w){ counts[w.status||"unknown"] = (counts[w.status||"unknown"]||0) + 1; });
     var labels = [
-      { key:"difficult", label:"Difficile", color:"#7A4A42" },
-      { key:"unknown", label:"Inconnu", color:"#9a9384" },
-      { key:"meaning_known", label:"Sens connu", color:"#5C7FA6" },
-      { key:"assisted", label:"Assisté", color:"#B58A5C" },
-      { key:"in_progress", label:"En cours", color:"var(--indigo)" },
-      { key:"learned", label:"Appris", color:"var(--seal)" }
+      { key:"unknown", label:"À revoir", color:"#9a9384" },
+      { key:"difficult", label:"Sens connue", color:"#7A4A42" },
+      { key:"meaning_known", label:"Assisté", color:"#5C7FA6" },
+      { key:"assisted", label:"Difficile", color:"#B58A5C" },
+      { key:"in_progress", label:"Correct", color:"var(--indigo)" },
+      { key:"learned", label:"Facile", color:"var(--seal)" }
     ];
     var html = labels.map(function(l){
       return '<span class="stat"><span class="dot" style="background:'+l.color+';"></span>'+l.label+' <b>'+counts[l.key]+'/'+total+'</b></span>';
@@ -13174,27 +13177,14 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
   }
   function applyVocabSrsRating(w, status){
     var srs = ensureVocabSrs(w);
-    // The reviewer picks the word's actual status directly (instead of an abstract
-    // difficulty rating) — it's stored as-is, and drives the same interval progression
-    // a difficulty rating would have, following the mastery ladder:
-    // difficult < unknown < meaning_known < assisted < in_progress < learned.
+    // The reviewer picks the word's actual status directly — it's stored as-is (for the
+    // list, filters and stats), and separately mapped to a real SM-2 quality grade (0-5)
+    // to drive the interval/ease math, using the natural 1-to-1 fit with our 6 statuses:
+    // unknown=0, difficult=1, meaning_known=2, assisted=3, in_progress=4, learned=5.
     w.status = status;
-    if(status === "difficult"){
-      srs.reps = 0; srs.interval = 1; srs.ease = Math.max(1.3, srs.ease - 0.35);
-    } else if(status === "unknown"){
-      srs.reps = 0; srs.interval = 1; srs.ease = Math.max(1.3, srs.ease - 0.25);
-    } else if(status === "meaning_known"){
-      srs.reps = Math.max(0, srs.reps - 1); srs.interval = 1; srs.ease = Math.max(1.3, srs.ease - 0.15);
-    } else if(status === "assisted"){
-      if(srs.reps===0) srs.interval=1; else if(srs.reps===1) srs.interval=3; else srs.interval = Math.max(1, Math.round(srs.interval*1.3));
-      srs.reps += 1;
-    } else if(status === "in_progress"){
-      if(srs.reps===0) srs.interval=2; else if(srs.reps===1) srs.interval=6; else srs.interval = Math.round(srs.interval*srs.ease);
-      srs.reps += 1;
-    } else if(status === "learned"){
-      srs.interval = Math.round((srs.interval||1)*srs.ease*1.3) || 4; srs.ease += 0.15; srs.reps += 1;
-    }
-    srs.due = Date.now() + srs.interval*24*60*60*1000;
+    var q = { unknown:0, difficult:1, meaning_known:2, assisted:3, in_progress:4, learned:5 }[status];
+    if(q === undefined) q = 3;
+    sm2Update(srs, q);
     recordReviewActivity();
     updateStreakDisplay();
     var el2 = document.getElementById("vocabDeckStreak");
@@ -13227,12 +13217,12 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     html += '<div id="vocabReviewBack" style="display:none;"></div>';
     html += '<button class="review-flip" id="btnVocabFlip">Retourner la carte</button>';
     html += '<div class="review-ratings" id="vocabReviewRatings" style="display:none;">'
-          + '<button data-vrating="difficult" style="background:#7A4A42;">Difficile</button>'
-          + '<button data-vrating="unknown" style="background:#9a9384;">Inconnu</button>'
-          + '<button data-vrating="meaning_known" style="background:#5C7FA6;">Sens connu</button>'
-          + '<button data-vrating="assisted" style="background:#B58A5C;">Assisté</button>'
-          + '<button data-vrating="in_progress" style="background:var(--indigo);">En cours</button>'
-          + '<button data-vrating="learned" style="background:var(--seal);">Appris</button>'
+          + '<button data-vrating="unknown" style="background:#9a9384;">À revoir</button>'
+          + '<button data-vrating="difficult" style="background:#7A4A42;">Sens connue</button>'
+          + '<button data-vrating="meaning_known" style="background:#5C7FA6;">Assisté</button>'
+          + '<button data-vrating="assisted" style="background:#B58A5C;">Difficile</button>'
+          + '<button data-vrating="in_progress" style="background:var(--indigo);">Correct</button>'
+          + '<button data-vrating="learned" style="background:var(--seal);">Facile</button>'
           + '</div>';
     body.innerHTML = html;
 
