@@ -599,6 +599,7 @@
         <select id="vfType">
           <option value="">—</option>
           <option value="nom">Nom</option>
+          <option value="pronom">Pronom</option>
           <option value="verbe">Verbe</option>
           <option value="adj-i">Adjectif en -i</option>
           <option value="adj-na">Adjectif en -na</option>
@@ -685,6 +686,7 @@
         <div class="jlpt-filter" id="vocabFilterType">
           <button type="button" class="active" data-val="">Tous</button>
           <button type="button" data-val="nom">Nom</button>
+          <button type="button" data-val="pronom">Pronom</button>
           <button type="button" data-val="verbe">Verbe</button>
           <button type="button" data-val="adj-i">Adj. -i</button>
           <button type="button" data-val="adj-na">Adj. -na</button>
@@ -12825,6 +12827,44 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
   }
 
   var vfSelectedThemes = [];
+  function renameVocabTheme(oldName){
+    var newName = prompt('Renommer l\'étiquette "' + oldName + '" en :', oldName);
+    if(newName === null) return false;
+    newName = newName.trim();
+    if(!newName || newName === oldName) return false;
+    allVocab().forEach(function(w){
+      if(!w.themes) return;
+      var idx = w.themes.indexOf(oldName);
+      if(idx === -1) return;
+      if(w.themes.indexOf(newName) === -1) w.themes[idx] = newName;
+      else w.themes.splice(idx, 1);
+    });
+    saveVocab();
+    var vi = vfSelectedThemes.indexOf(oldName);
+    if(vi !== -1) vfSelectedThemes[vi] = newName;
+    var fi = vocabFilters.themes.indexOf(oldName);
+    if(fi !== -1) vocabFilters.themes[fi] = newName;
+    var ci = vocabFilterThemesChecked.indexOf(oldName);
+    if(ci !== -1) vocabFilterThemesChecked[ci] = newName;
+    return true;
+  }
+  function attachThemeChipLongPress(chip, name, onRenamed){
+    var pressTimer = null;
+    var longPressFired = false;
+    function start(){
+      longPressFired = false;
+      pressTimer = setTimeout(function(){ longPressFired = true; if(renameVocabTheme(name)) onRenamed(); }, 500);
+    }
+    function cancel(){ clearTimeout(pressTimer); }
+    chip.addEventListener("touchstart", start, {passive:true});
+    chip.addEventListener("touchend", cancel);
+    chip.addEventListener("touchcancel", cancel);
+    chip.addEventListener("mousedown", start);
+    chip.addEventListener("mouseup", cancel);
+    chip.addEventListener("mouseleave", cancel);
+    chip.addEventListener("click", function(e){ if(longPressFired){ e.stopPropagation(); longPressFired = false; } }, true);
+  }
+
   function renderVfThemeChips(currentThemes){
     var allThemes = allVocabThemes();
     var box = document.getElementById("vfThemeChips");
@@ -12839,6 +12879,7 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
         if(idx === -1) vfSelectedThemes.push(t); else vfSelectedThemes.splice(idx, 1);
         chip.classList.toggle("active");
       });
+      attachThemeChipLongPress(chip, chip.getAttribute("data-vfchip"), function(){ renderVfThemeChips(); });
     });
   }
 
@@ -13017,6 +13058,7 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
         if(idx === -1) vocabFilterThemesChecked.push(t); else vocabFilterThemesChecked.splice(idx, 1);
         chip.classList.toggle("active");
       });
+      attachThemeChipLongPress(chip, chip.getAttribute("data-theme"), function(){ renderVocabFilterThemeChips(); });
     });
   }
   document.getElementById("vocabFilterThemeSearch").addEventListener("input", renderVocabFilterThemeChips);
