@@ -11991,8 +11991,16 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
       var comps = draftIsRadical ? [] : (SEED_DECOMP[draft.char] || []);
       comps.forEach(function(c){
         if(!state.nodes[c]){
-          var seedR = SEED_RADICALS.find(function(s){ return s.char === c; });
-          state.nodes[c] = { id:c, char:c, type:"r", meaning: seedR ? seedR.meaning : "", onyomi:"", kunyomi:"", jlpt:"", mnemonic:"", parents:[], status:"unknown", isCustom:false, image:null, reviewed:false };
+          // A decomposition component can itself be a full kanji (many Kangxi radicals double
+          // as standalone kanji, like 心/水/木) — check that first so it's never silently
+          // downgraded to a bare radical when we actually have its readings/meaning/JLPT on file.
+          var seedK = SEED_KANJI.find(function(s){ return s.char === c; });
+          if(seedK){
+            state.nodes[c] = { id:c, char:c, type:"k", meaning:seedK.meaning, onyomi:seedK.onyomi||"", kunyomi:seedK.kunyomi||"", jlpt:seedK.jlpt||"", mnemonic:"", parents:[], status:"unknown", isCustom:false, image:null, reviewed:false };
+          } else {
+            var seedR = SEED_RADICALS.find(function(s){ return s.char === c; });
+            state.nodes[c] = { id:c, char:c, type:"r", meaning: seedR ? seedR.meaning : "", onyomi:"", kunyomi:"", jlpt:"", mnemonic:"", parents:[], status:"unknown", isCustom:false, image:null, reviewed:false };
+          }
         }
         pendingParents.push(c);
       });
