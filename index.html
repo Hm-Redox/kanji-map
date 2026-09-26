@@ -479,7 +479,7 @@
       <button id="btnToggleAllMeanings" class="toggle-all-btn" type="button">👁 Traductions</button>
     </div>
     <div style="padding:8px 16px 0;">
-      <input type="text" id="vocabSearch" placeholder="Chercher un mot, une lecture, un sens…" style="width:100%; border:1px solid var(--border); background:var(--paper); padding:9px 11px; font-size:14px; border-radius:3px; font-family:inherit;">
+      <input type="text" id="vocabSearch" placeholder="Chercher un mot, une lecture, un sens…" style="width:100%; border:1px solid var(--border); background:var(--paper); color:var(--ink); padding:9px 11px; font-size:14px; border-radius:3px; font-family:inherit;">
     </div>
     <div id="vocabStatsBar" style="display:flex; gap:6px; padding:8px 16px 0; flex-wrap:wrap;"></div>
     <div id="vocabListBody" style="flex:1; overflow-y:auto; padding:8px 16px 20px;"></div>
@@ -732,7 +732,7 @@
         <h3>Bibliothèque de vocabulaire</h3>
         <button class="sheet-close" data-close>✕</button>
       </div>
-      <input type="text" id="vocabLibSearch" placeholder="Chercher un mot, un sens…" style="width:100%; border:1px solid var(--border); background:var(--paper); padding:9px 11px; font-size:14px; border-radius:3px; font-family:inherit; margin-bottom:8px;">
+      <input type="text" id="vocabLibSearch" placeholder="Chercher un mot, un sens…" style="width:100%; border:1px solid var(--border); background:var(--paper); color:var(--ink); padding:9px 11px; font-size:14px; border-radius:3px; font-family:inherit; margin-bottom:8px;">
       <div class="jlpt-filter" id="vocabLibJlpt" style="margin-bottom:6px;">
         <button type="button" data-val="all">Tous</button>
         <button type="button" class="active" data-val="N5">N5</button>
@@ -740,7 +740,7 @@
         <button type="button" data-val="N3">N3</button>
         <button type="button" data-val="N2-N1">N2-N1</button>
       </div>
-      <input type="text" id="vocabLibKanji" maxlength="2" placeholder="Kanji imposé (ex : 食)" style="width:120px; border:1px solid var(--border); background:var(--paper); padding:7px 9px; font-size:14px; border-radius:3px; font-family:var(--kanji-display); text-align:center; margin-bottom:8px;">
+      <input type="text" id="vocabLibKanji" maxlength="2" placeholder="Kanji imposé (ex : 食)" style="width:120px; border:1px solid var(--border); background:var(--paper); color:var(--ink); padding:7px 9px; font-size:14px; border-radius:3px; font-family:var(--kanji-display); text-align:center; margin-bottom:8px;">
       <div id="vocabLibList" style="max-height:60vh; overflow-y:auto;"></div>
     </div>
   </div>
@@ -11309,7 +11309,13 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
   }
   backdrop.addEventListener("click", closeSheets);
   document.querySelectorAll("[data-close]").forEach(function(b){
-    b.addEventListener("click", closeSheets);
+    b.addEventListener("click", function(){
+      // Safety net: if the kanji form gets cancelled instead of saved, don't leave these
+      // "come back here after adding the kanji" flags armed for some unrelated later save.
+      vocabDeckKanjiAddReturn = false;
+      vocabDetailKanjiAddReturn = null;
+      closeSheets();
+    });
   });
 
   // ---------- Detail sheet ----------
@@ -11800,6 +11806,10 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
   var parentSearch = document.getElementById("parentSearch");
   var parentSuggest = document.getElementById("parentSuggest");
 
+  // Precomputed lookup so a character that's a real seed kanji is never mistaken for
+  // (or offered as) a bare radical when it happens to share a glyph with one.
+  var SEED_KANJI_CHARS = new Set(SEED_KANJI.map(function(k){ return k.char; }));
+
   function runParentSearch(){
     var q = parentSearch.value.trim().toLowerCase();
     var pool = allNodes().filter(function(n){
@@ -11820,6 +11830,9 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     var seedRadicalMatches = SEED_RADICALS.filter(function(sr){
       if(state.nodes[sr.char]) return false;
       if(pendingParents.indexOf(sr.char) !== -1) return false;
+      // A character that's also a real kanji in the seed data should only ever be offered
+      // as that richer kanji entry (with its readings/JLPT) — never duplicated as a bare radical.
+      if(SEED_KANJI_CHARS.has(sr.char)) return false;
       if(!q) return false; // only surface once the user searches, to avoid flooding the empty-query list
       return sr.char.indexOf(q)!==-1 || sr.meaning.toLowerCase().indexOf(q)!==-1;
     }).slice(0, 10);
@@ -11894,7 +11907,15 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
         if(state.nodes[ch]){
           pendingParents.push(ch);
         } else {
-          state.nodes[ch] = { id:ch, char:ch, type:"r", meaning:"", onyomi:"", kunyomi:"", jlpt:"", mnemonic:"", parents:[], status:"unknown", reviewed:false };
+          // Even on the "quick create" fallback, check whether this exact character is
+          // already a known kanji in the seed data — never silently downgrade it to a
+          // blank radical if we actually have its readings/meaning/JLPT on file.
+          var seedK = SEED_KANJI.find(function(s){ return s.char === ch; });
+          if(seedK){
+            state.nodes[ch] = { id:ch, char:ch, type:"k", meaning:seedK.meaning, onyomi:seedK.onyomi||"", kunyomi:seedK.kunyomi||"", jlpt:seedK.jlpt||"", mnemonic:"", parents:[], status:"unknown", reviewed:false };
+          } else {
+            state.nodes[ch] = { id:ch, char:ch, type:"r", meaning:"", onyomi:"", kunyomi:"", jlpt:"", mnemonic:"", parents:[], status:"unknown", reviewed:false };
+          }
           save();
           pendingParents.push(ch);
         }
@@ -12059,6 +12080,22 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
       }
       viewDeck.classList.add("show");
       renderReviewCard();
+      return;
+    }
+
+    // If this kanji was created from within a vocab deck review card (or a word's fiche)
+    // via the "＋ ajouter" chip, jump straight back there and refresh it, instead of
+    // leaving it showing the stale "not on the map yet" state.
+    if(vocabDeckKanjiAddReturn){
+      vocabDeckKanjiAddReturn = false;
+      document.getElementById("viewVocabDeck").classList.add("show");
+      renderVocabReviewCard();
+      return;
+    }
+    if(vocabDetailKanjiAddReturn){
+      var returnWordId = vocabDetailKanjiAddReturn;
+      vocabDetailKanjiAddReturn = null;
+      showVocabDetail(returnWordId);
       return;
     }
 
@@ -12700,6 +12737,8 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
 
   var vocabEditingId = null;
   var vocabDeckEditingReturnId = null;
+  var vocabDeckKanjiAddReturn = false;
+  var vocabDetailKanjiAddReturn = null;
   var vocabFilters = { jlpt:"", type:"", kanji:"", themes:[], status:"" };
   var vocabRevealed = {}; // id -> true, transient (resets on full re-render call from filters/search changes)
   var vocabShowAllFurigana = false;
@@ -12723,6 +12762,10 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     return true;
   }
 
+  function vocabTypeLabel(type){
+    var labels = { nom:"Nom", pronom:"Pronom", verbe:"Verbe", "adj-i":"Adjectif en -i", "adj-na":"Adjectif en -na", adverbe:"Adverbe", particule:"Particule", expression:"Expression", autre:"Autre" };
+    return labels[type] || type;
+  }
   function vocabStatusColor(status){
     if(status === "learned") return "var(--seal)";
     if(status === "in_progress") return "var(--indigo)";
@@ -12969,7 +13012,7 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     var html = '<div class="kanji-hero">'+esc(w.word)+'</div>';
     html += '<div class="row"><span class="k">Lecture</span><span class="v">'+esc(w.reading||"—")+'</span></div>';
     html += '<div class="row"><span class="k">Traduction</span><span class="v">'+esc(w.meaning||"—")+'</span></div>';
-    if(w.type){ html += '<div class="row"><span class="k">Type</span><span class="v">'+esc(w.type)+'</span></div>'; }
+    if(w.type){ html += '<div class="row"><span class="k">Type</span><span class="v">'+esc(vocabTypeLabel(w.type))+'</span></div>'; }
     if(w.jlpt){ html += '<div class="row"><span class="k">JLPT</span><span class="v">'+esc(w.jlpt)+'</span></div>'; }
     if((w.themes||[]).length){ html += '<div class="row"><span class="k">Thèmes</span><span class="v">'+esc(w.themes.join(", "))+'</span></div>'; }
     if(chars.length){
@@ -12997,6 +13040,7 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     document.querySelectorAll("#vocabDetailBody [data-vocabkanjinew]").forEach(function(el){
       el.addEventListener("click", function(){
         var ch = el.getAttribute("data-vocabkanjinew");
+        vocabDetailKanjiAddReturn = currentVocabDetailId;
         closeSheets();
         setTimeout(function(){ openKanjiLibrarySearch(ch); }, 200);
       });
@@ -13280,6 +13324,9 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
       var backHtml = '<div class="review-back">';
       backHtml += '<div class="row"><span class="k">Lecture</span><span class="v">'+esc(w.reading||"—")+'</span></div>';
       backHtml += '<div class="row"><span class="k">Traduction</span><span class="v">'+esc(w.meaning||"—")+'</span></div>';
+      if(w.jlpt){ backHtml += '<div class="row"><span class="k">Niveau</span><span class="v">'+esc(w.jlpt)+'</span></div>'; }
+      if(w.type){ backHtml += '<div class="row"><span class="k">Type</span><span class="v">'+esc(vocabTypeLabel(w.type))+'</span></div>'; }
+      if((w.themes||[]).length){ backHtml += '<div class="row"><span class="k">Thèmes</span><span class="v">'+esc(w.themes.join(", "))+'</span></div>'; }
       if(chars.length){
         backHtml += '<div style="margin-top:10px;"><span class="k" style="font-size:12px;color:var(--ink-soft)">Kanji utilisés</span><br>';
         chars.forEach(function(c){
@@ -13308,7 +13355,10 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
       });
       document.querySelectorAll("#vocabReviewBack [data-vdecknew]").forEach(function(tag){
         tag.style.cursor = "pointer";
-        tag.addEventListener("click", function(){ openKanjiLibrarySearch(tag.getAttribute("data-vdecknew")); });
+        tag.addEventListener("click", function(){
+          vocabDeckKanjiAddReturn = true;
+          openKanjiLibrarySearch(tag.getAttribute("data-vdecknew"));
+        });
       });
     });
     document.querySelectorAll("#vocabReviewRatings [data-vrating]").forEach(function(b){
