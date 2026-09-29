@@ -252,7 +252,7 @@
   .review-progress{ text-align:center; font-size:12px; color:var(--ink-soft); margin-bottom:6px; }
   .review-kanji{
     text-align:center; font-size:88px; margin: 18px 0; font-family:var(--kanji-display);
-    color:var(--ink);
+    color:var(--ink); white-space:nowrap;
   }
   .review-back{ padding:0 4px 8px; }
   .review-back .row{
@@ -622,7 +622,8 @@
       <div class="field">
         <label>Thèmes</label>
         <div id="vfThemeChips" style="margin-bottom:8px;"></div>
-        <input type="text" id="vfThemes" placeholder="ou tape une nouvelle étiquette, séparées par des virgules">
+        <input type="text" id="vfThemes" placeholder="ou tape une nouvelle étiquette, séparées par des virgules" autocomplete="off">
+        <div id="vfThemesAutocomplete" style="display:none; border:1px solid var(--border); border-top:none; background:var(--paper); max-height:160px; overflow-y:auto;"></div>
       </div>
       <div class="field">
         <label>Mnémonique / notes perso</label>
@@ -12934,6 +12935,46 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     });
   }
 
+  // Autocomplete for the free-text theme input: suggests existing themes matching whatever
+  // the person is currently typing (the segment after the last comma), so a near-duplicate
+  // tag ("Nouriture" vs "Nourriture") doesn't slip in by typo.
+  (function setupVfThemesAutocomplete(){
+    var input = document.getElementById("vfThemes");
+    var box = document.getElementById("vfThemesAutocomplete");
+    function currentSegment(){
+      var parts = input.value.split(",");
+      return parts[parts.length - 1].trim();
+    }
+    function renderSuggestions(){
+      var seg = currentSegment().toLowerCase();
+      if(!seg){ box.style.display = "none"; return; }
+      var already = input.value.split(",").map(function(s){ return s.trim().toLowerCase(); });
+      var matches = allVocabThemes().filter(function(t){
+        return t.toLowerCase().indexOf(seg) !== -1
+          && vfSelectedThemes.indexOf(t) === -1
+          && already.indexOf(t.toLowerCase()) === -1;
+      }).slice(0, 6);
+      if(!matches.length){ box.style.display = "none"; return; }
+      box.innerHTML = matches.map(function(t){
+        return '<div data-vfsuggest="'+esc(t)+'" style="padding:9px 11px; font-size:13.5px; cursor:pointer; border-bottom:1px solid var(--paper-line);">'+esc(t)+'</div>';
+      }).join("");
+      box.style.display = "block";
+      document.querySelectorAll("#vfThemesAutocomplete [data-vfsuggest]").forEach(function(el){
+        el.addEventListener("mousedown", function(e){ e.preventDefault(); });
+        el.addEventListener("click", function(){
+          var t = el.getAttribute("data-vfsuggest");
+          var parts = input.value.split(",");
+          parts[parts.length - 1] = " " + t;
+          input.value = parts.join(",").replace(/^ /, "") + ", ";
+          box.style.display = "none";
+          input.focus();
+        });
+      });
+    }
+    input.addEventListener("input", renderSuggestions);
+    input.addEventListener("blur", function(){ setTimeout(function(){ box.style.display = "none"; }, 150); });
+  })();
+
   function openVocabForm(id){
     vocabEditingId = id || null;
     var errW = document.getElementById("errVfWord"), errM = document.getElementById("errVfMeaning");
@@ -13304,7 +13345,8 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     var w = vocabReviewQueue[vocabReviewIndex];
     var hasKanji = kanjiCharsIn(w.word).length > 0;
     var html = '<div class="review-progress">'+(vocabReviewIndex+1)+' / '+vocabReviewQueue.length+'</div>';
-    html += '<div class="review-kanji" id="vocabReviewWord" style="cursor:pointer;">'+esc(w.word)+'</div>';
+    var wordFontSize = w.word.length <= 2 ? 88 : w.word.length <= 4 ? 64 : w.word.length <= 6 ? 48 : w.word.length <= 8 ? 38 : 30;
+    html += '<div class="review-kanji" id="vocabReviewWord" style="cursor:pointer; font-size:'+wordFontSize+'px;">'+esc(w.word)+'</div>';
     if(hasKanji){
       html += '<div id="vocabReviewFurigana" style="text-align:center; font-size:14px; color:var(--ink-soft); margin-top:-10px; margin-bottom:14px; display:none;">'+esc(w.reading||"")+'</div>';
     }
