@@ -714,6 +714,14 @@
         <input type="text" id="vocabFilterKanji" maxlength="2" placeholder="ex : 食" style="max-width:80px; font-family:var(--kanji-display); font-size:18px; text-align:center;">
       </div>
       <div class="field">
+        <label>Kanji sur la carte</label>
+        <div class="jlpt-filter" id="vocabFilterKanjiComplete">
+          <button type="button" class="active" data-val="">Tous</button>
+          <button type="button" data-val="complete">✓ Tous présents</button>
+          <button type="button" data-val="incomplete">⚠ Il en manque</button>
+        </div>
+      </div>
+      <div class="field">
         <label>Thèmes</label>
         <input type="text" id="vocabFilterThemeSearch" placeholder="Chercher un thème…" style="width:100%; border:1px solid var(--border); background:var(--paper); padding:8px 10px; font-size:13px; border-radius:3px; font-family:inherit; margin-bottom:8px;">
         <div id="vocabFilterThemes"></div>
@@ -12748,17 +12756,25 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
   var vocabDeckEditingReturnId = null;
   var vocabDeckKanjiAddReturn = false;
   var vocabDetailKanjiAddReturn = null;
-  var vocabFilters = { jlpt:"", type:"", kanji:"", themes:[], status:"" };
+  var vocabFilters = { jlpt:"", type:"", kanji:"", themes:[], status:"", kanjiComplete:"" };
   var vocabRevealed = {}; // id -> true, transient (resets on full re-render call from filters/search changes)
   var vocabShowAllFurigana = false;
   var vocabShowAllMeanings = false;
   var vocabFuriganaTimer = null;
+
+  function vocabKanjiComplete(w){
+    var chars = kanjiCharsIn(w.word);
+    if(!chars.length) return true;
+    return chars.every(function(c){ return !!state.nodes[c]; });
+  }
 
   function vocabRowMatchesFilters(w, q){
     if(vocabFilters.jlpt && w.jlpt !== vocabFilters.jlpt) return false;
     if(vocabFilters.type && w.type !== vocabFilters.type) return false;
     if(vocabFilters.status && (w.status||"unknown") !== vocabFilters.status) return false;
     if(vocabFilters.kanji && kanjiCharsIn(w.word).indexOf(vocabFilters.kanji) === -1) return false;
+    if(vocabFilters.kanjiComplete === "complete" && !vocabKanjiComplete(w)) return false;
+    if(vocabFilters.kanjiComplete === "incomplete" && vocabKanjiComplete(w)) return false;
     if(vocabFilters.themes.length){
       var wt = w.themes || [];
       var ok = vocabFilters.themes.some(function(t){ return wt.indexOf(t) !== -1; });
@@ -13163,11 +13179,18 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     document.querySelectorAll("#vocabFilterJlpt button").forEach(function(b){ b.classList.toggle("active", b.getAttribute("data-val")===vocabFilters.jlpt); });
     document.querySelectorAll("#vocabFilterType button").forEach(function(b){ b.classList.toggle("active", b.getAttribute("data-val")===vocabFilters.type); });
     document.querySelectorAll("#vocabFilterStatus button").forEach(function(b){ b.classList.toggle("active", b.getAttribute("data-val")===vocabFilters.status); });
+    document.querySelectorAll("#vocabFilterKanjiComplete button").forEach(function(b){ b.classList.toggle("active", b.getAttribute("data-val")===vocabFilters.kanjiComplete); });
     document.getElementById("vocabFilterKanji").value = vocabFilters.kanji;
     closeSheets();
     openSheet(document.getElementById("sheetVocabFilter"));
   }
   document.getElementById("btnVocabFilter").addEventListener("click", openVocabFilterSheet);
+  document.querySelectorAll("#vocabFilterKanjiComplete button").forEach(function(b){
+    b.addEventListener("click", function(){
+      document.querySelectorAll("#vocabFilterKanjiComplete button").forEach(function(x){ x.classList.remove("active"); });
+      b.classList.add("active");
+    });
+  });
   document.querySelectorAll("#vocabFilterJlpt button").forEach(function(b){
     b.addEventListener("click", function(){
       document.querySelectorAll("#vocabFilterJlpt button").forEach(function(x){ x.classList.remove("active"); });
@@ -13197,16 +13220,18 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     var activeJlpt = document.querySelector("#vocabFilterJlpt button.active");
     var activeType = document.querySelector("#vocabFilterType button.active");
     var activeStatus = document.querySelector("#vocabFilterStatus button.active");
+    var activeKanjiComplete = document.querySelector("#vocabFilterKanjiComplete button.active");
     vocabFilters.jlpt = activeJlpt ? activeJlpt.getAttribute("data-val") : "";
     vocabFilters.type = activeType ? activeType.getAttribute("data-val") : "";
     vocabFilters.status = activeStatus ? activeStatus.getAttribute("data-val") : "";
+    vocabFilters.kanjiComplete = activeKanjiComplete ? activeKanjiComplete.getAttribute("data-val") : "";
     vocabFilters.kanji = document.getElementById("vocabFilterKanji").value.trim();
     vocabFilters.themes = vocabFilterThemesChecked.slice();
     closeSheets();
     refreshActiveVocabView();
   });
   document.getElementById("btnVocabFilterReset").addEventListener("click", function(){
-    vocabFilters = { jlpt:"", type:"", kanji:"", themes:[], status:"" };
+    vocabFilters = { jlpt:"", type:"", kanji:"", themes:[], status:"", kanjiComplete:"" };
     closeSheets();
     refreshActiveVocabView();
   });
@@ -13302,6 +13327,8 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
       if(vocabFilters.type && w.type !== vocabFilters.type) return false;
       if(vocabFilters.status && (w.status||"unknown") !== vocabFilters.status) return false;
       if(vocabFilters.kanji && kanjiCharsIn(w.word).indexOf(vocabFilters.kanji) === -1) return false;
+      if(vocabFilters.kanjiComplete === "complete" && !vocabKanjiComplete(w)) return false;
+      if(vocabFilters.kanjiComplete === "incomplete" && vocabKanjiComplete(w)) return false;
       if(vocabFilters.themes.length){
         var wt = w.themes || [];
         var ok = vocabFilters.themes.some(function(t){ return wt.indexOf(t) !== -1; });
