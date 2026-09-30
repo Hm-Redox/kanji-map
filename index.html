@@ -4,13 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>組み立て — Carte de kanjis</title>
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#E7E1CE">
-<link rel="apple-touch-icon" href="icon-192.png">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="組み立て">
-
 <style>
   :root{
     --paper: #E7E1CE;
@@ -71,6 +64,20 @@
   .stat b{ color:var(--ink); font-weight:600; }
 
   #cy{ position:absolute; inset:0; }
+
+  /* --- Map tab home: kanji list (replaces the old global map) --- */
+  #kanjiHome{
+    position:absolute; top:96px; left:0; right:0; bottom:0; z-index:15;
+    display:none; flex-direction:column; background:var(--paper);
+  }
+  #kanjiHome.show{ display:flex; }
+  #kanjiHomeSearch{
+    margin:4px 16px 6px; border:1px solid var(--border); background:var(--paper-card); color:var(--ink);
+    padding:9px 11px; font-size:14px; border-radius:3px; font-family:inherit;
+  }
+  #kanjiHomeCount{ font-size:11px; color:var(--ink-soft); padding:0 18px 4px; }
+  #kanjiHomeList{ flex:1; overflow-y:auto; padding:0 16px 96px; }
+  #kanjiHomeList .status-dot{ width:7px; height:7px; border-radius:50%; flex:none; }
 
   /* genkouyoushi grid backdrop for empty state */
   #empty{
@@ -418,6 +425,12 @@
 <div id="app">
   <div id="cy"></div>
 
+  <div id="kanjiHome">
+    <input type="text" id="kanjiHomeSearch" placeholder="Chercher un kanji, un radical, un sens, une lecture…" autocomplete="off">
+    <div id="kanjiHomeCount"></div>
+    <div id="kanjiHomeList"></div>
+  </div>
+
   <div id="empty">
     <div class="glyph kanji-font">木</div>
     <h2>La carte est vide</h2>
@@ -427,7 +440,7 @@
   <div id="focusBanner">Vue isolée · tape un kanji pour repartir de lui, ou dans le vide pour revenir</div>
 
   <div id="quickFilterBar">
-    <button type="button" class="active" data-qfilter="all">Tous</button>
+    <button type="button" class="active" data-qfilter="all">Liste</button>
     <button type="button" data-qfilter="N5">N5</button>
     <button type="button" data-qfilter="N4">N4</button>
     <button type="button" data-qfilter="N3">N3</button>
@@ -11215,6 +11228,58 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     return n.type === "k" && n.jlpt === quickCategoryFilter;
   }
 
+  var KANJI_HOME_ORDER = { "N5":0, "N4":1, "N3":2, "N2-N1":3 };
+  function kanjiHomeRank(n){
+    if(n.type === "r") return 5;
+    return (n.jlpt in KANJI_HOME_ORDER) ? KANJI_HOME_ORDER[n.jlpt] : 4;
+  }
+  function renderKanjiHome(){
+    var input = document.getElementById("kanjiHomeSearch");
+    var q = input.value.trim().toLowerCase();
+    var items = allNodes().filter(function(n){
+      if(currentStatusFilter && (n.status||"unknown") !== currentStatusFilter) return false;
+      if(!q) return true;
+      return (n.char||"").toLowerCase().indexOf(q)!==-1
+          || (n.meaning||"").toLowerCase().indexOf(q)!==-1
+          || (n.onyomi||"").toLowerCase().indexOf(q)!==-1
+          || (n.kunyomi||"").toLowerCase().indexOf(q)!==-1;
+    }).sort(function(a,b){
+      var d = kanjiHomeRank(a) - kanjiHomeRank(b);
+      return d !== 0 ? d : (a.meaning||"").localeCompare(b.meaning||"");
+    });
+    var html = "";
+    items.forEach(function(n){
+      var badge = n.type === "r" ? "radical" : (n.jlpt || "");
+      html += '<div class="lib-row" data-home-kanji="'+esc(n.id)+'">'
+            + '<span class="status-dot" style="background:'+statusColor(n.status||"unknown")+'"></span>'
+            + chSpanOf(n)
+            + '<span class="info"><span class="m">'+esc(sideTextOf(n) || labelOf(n))+'</span></span>'
+            + (n.hiddenFromMap ? '<span class="jlpt-badge">masqué</span>' : '')
+            + (badge ? '<span class="jlpt-badge">'+esc(badge)+'</span>' : '')
+            + '</div>';
+    });
+    if(items.length === 0) html = '<div class="empty-msg" style="padding:20px 4px; font-size:13px; color:var(--ink-soft);">Aucun résultat.</div>';
+    document.getElementById("kanjiHomeList").innerHTML = html;
+    document.getElementById("kanjiHomeCount").textContent = items.length + (items.length > 1 ? " éléments" : " élément");
+  }
+  document.getElementById("kanjiHomeList").addEventListener("click", function(e){
+    var row = e.target.closest && e.target.closest("[data-home-kanji]");
+    if(!row) return;
+    var id = row.getAttribute("data-home-kanji");
+    if(!state.nodes[id]) return;
+    document.getElementById("kanjiHomeSearch").blur();
+    if(state.nodes[id].hiddenFromMap){ showDetail(id); return; }
+    enterFocusMode(id);
+  });
+  (function(){
+    var input = document.getElementById("kanjiHomeSearch");
+    var composing = false;
+    input.addEventListener("compositionstart", function(){ composing = true; });
+    input.addEventListener("compositionend", function(){ composing = false; renderKanjiHome(); });
+    input.addEventListener("input", function(){ if(!composing) renderKanjiHome(); });
+    input.addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); input.blur(); } });
+  })();
+
   function renderGraph(cachedPositions){
     if(inFocusMode){
       inFocusMode = false;
@@ -11224,6 +11289,15 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     }
     cy.elements().remove();
     var allTheNodes = allNodes();
+    // No filter selected = the kanji list, never the full global map (too heavy to lay out).
+    var homeMode = !quickCategoryFilter;
+    document.getElementById("kanjiHome").classList.toggle("show", homeMode && allTheNodes.length > 0);
+    if(homeMode){
+      document.getElementById("empty").classList.toggle("show", allTheNodes.length===0);
+      renderKanjiHome();
+      renderStats();
+      return;
+    }
     var nodes = allTheNodes.filter(function(n){ return !n.hiddenFromMap && matchesQuickFilter(n); });
     document.getElementById("empty").classList.toggle("show", allTheNodes.length===0);
     nodes.forEach(function(n){
@@ -11295,6 +11369,7 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
           currentStatusFilter = status;
           highlightByStatus(status);
         }
+        if(!quickCategoryFilter && !inFocusMode) renderKanjiHome();
         document.querySelectorAll("#stats .stat").forEach(function(s){
           s.style.outline = (s.getAttribute("data-status-filter")===currentStatusFilter) ? "2px solid var(--ink)" : "none";
         });
@@ -11576,6 +11651,7 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
     cy.nodes().forEach(function(n){ focusSavedPositions[n.id()] = n.position(); });
     inFocusMode = true;
     focusAnchorId = id;
+    document.getElementById("kanjiHome").classList.remove("show");
     document.getElementById("focusBanner").classList.add("show");
     cy.batch(function(){
       // The isolated view always shows the kanji's full construction, regardless of the
@@ -12324,6 +12400,11 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
   mapSearchInput.addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); mapSearchInput.blur(); } });
 
   document.getElementById("btnMapSearch").addEventListener("click", function(){
+    if(!quickCategoryFilter && !inFocusMode){
+      closeSheets();
+      document.getElementById("kanjiHomeSearch").focus();
+      return;
+    }
     mapSearchInput.value = "";
     renderMapSearch();
     closeSheets();
@@ -12832,7 +12913,7 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
 
     var html = "";
     items.forEach(function(w){
-      var isRevealed = vocabShowAllMeanings || !!vocabRevealed[w.id];
+      var isRevealed = (w.id in vocabRevealed) ? vocabRevealed[w.id] : vocabShowAllMeanings;
       var kanjiChars = kanjiCharsIn(w.word);
       var hasKanji = kanjiChars.length > 0;
       var kanjiComplete = hasKanji && kanjiChars.every(function(c){ return !!state.nodes[c]; });
@@ -12861,7 +12942,8 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
       btn.addEventListener("click", function(e){
         e.stopPropagation();
         var id = btn.getAttribute("data-vocabreveal");
-        vocabRevealed[id] = !vocabRevealed[id];
+        var cur = (id in vocabRevealed) ? vocabRevealed[id] : vocabShowAllMeanings;
+        vocabRevealed[id] = !cur;
         renderVocabList();
       });
     });
@@ -13148,6 +13230,7 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
   });
   document.getElementById("btnToggleAllMeanings").addEventListener("click", function(){
     vocabShowAllMeanings = !vocabShowAllMeanings;
+    vocabRevealed = {}; // global toggle overrides any per-word state
     this.classList.toggle("active", vocabShowAllMeanings);
     renderVocabList();
   });
@@ -13503,14 +13586,6 @@ var SEED_DECOMP = {"亜": ["一", "口"], "阿": ["一", "口", "亅"], "哀": [
   loadVocab();
   renderGraph();
 })();
-</script>
-
-<script>
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", function(){
-    navigator.serviceWorker.register("sw.js").catch(function(e){ console.error("SW error", e); });
-  });
-}
 </script>
 </body>
 </html>
